@@ -1,0 +1,4 @@
+node_modules
+dist
+__pycache__
+sample_data

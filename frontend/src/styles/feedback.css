@@ -1,0 +1,86 @@
+/* Сообщения, загрузка, пустые состояния, зона загрузки файлов */
+
+/* ---------- прочее ---------- */
+
+.legend-text {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.empty,
+.loader,
+.page-loader {
+  padding: 34px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.page-loader {
+  padding-top: 120px;
+}
+
+.alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.alert-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.alert-success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.alert-close {
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+}
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  color: var(--muted);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone:hover,
+.dropzone.over {
+  border-color: var(--accent);
+  background: #f8fbff;
+}
+
+.dropzone strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.inline-form .field {
+  flex: 1 1 170px;
+  min-width: min(170px, 100%);
+}

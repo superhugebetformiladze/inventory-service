@@ -1,0 +1,273 @@
+/* Отдельные экраны: станок, оборудование, модалка, вход, справка */
+
+/* ---------- страница станка ---------- */
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.page-head h1 {
+  font-size: 22px;
+  margin: 4px 0 6px;
+}
+
+.btn.link.back {
+  padding: 0;
+  font-size: 13px;
+}
+
+.page-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.page-head-filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.chip.warn {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.chart-link {
+  fill: var(--text);
+  cursor: pointer;
+}
+
+.chart-link:hover {
+  fill: var(--accent);
+  text-decoration: underline;
+}
+
+.machine-link {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--border);
+}
+
+.machine-link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.passport {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 10px 24px;
+}
+
+.passport div {
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+}
+
+.passport dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.passport dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- оборудование в админке ---------- */
+
+.import-report {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-actions-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search {
+  width: 240px;
+  padding: 7px 11px;
+}
+
+.table select {
+  padding: 5px 8px;
+  font-size: 12px;
+  min-width: 190px;
+}
+
+.table select.guess {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+/* ---------- модальное окно карточки ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 22px;
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+}
+
+.modal h2 {
+  font-size: 17px;
+  margin-bottom: 16px;
+}
+
+.modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 12px;
+}
+
+.modal-grid .field.wide {
+  grid-column: 1 / -1;
+}
+
+.modal-grid textarea {
+  font: inherit;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  resize: vertical;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ---------- вход ---------- */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(1200px 600px at 50% -10%, #dbeafe, var(--bg));
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-brand {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.login-brand h1 {
+  font-size: 17px;
+}
+
+.login-brand p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- справка по формулам ---------- */
+
+.formulas summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.formulas summary::before {
+  content: '?';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  font-size: 12px;
+  flex: none;
+}
+
+.formulas summary::-webkit-details-marker {
+  display: none;
+}
+
+.formulas[open] summary {
+  margin-bottom: 12px;
+}
+
+.formulas .formula {
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.formulas .hint {
+  margin-top: 0;
+  margin-bottom: 12px;
+}

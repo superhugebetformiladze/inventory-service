@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Мониторинг станков — презентация проекта</title>
+<style>
+  @page { size: 13.333in 7.5in; margin: 0; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #0f172a;
+    --slate: #475569;
+    --muted: #94a3b8;
+    --line: #e2e8f0;
+    --panel: #f8fafc;
+    --green: #16a34a;
+    --green-soft: #dcfce7;
+    --orange: #f97316;
+    --orange-soft: #ffedd5;
+    --blue: #2563eb;
+    --blue-soft: #dbeafe;
+  }
+
+  body {
+    font-family: "Segoe UI", "Inter", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    counter-reset: slide;
+  }
+
+  .slide {
+    width: 13.333in;
+    height: 7.5in;
+    position: relative;
+    overflow: hidden;
+    padding: 54px 64px 48px;
+    background: #fff;
+    break-after: page;
+    counter-increment: slide;
+    display: flex;
+    flex-direction: column;
+  }
+  .slide:last-child { break-after: auto; }
+
+  /* Нумерация и тонкая линия-акцент сверху каждого слайда */
+  .slide:not(.cover):not(.closing)::before {
+    content: "";
+    position: absolute; top: 0; left: 0;
+    width: 220px; height: 5px;
+    background: var(--green);
+  }
+  .slide:not(.cover):not(.closing)::after {
+    content: counter(slide);
+    position: absolute; right: 64px; bottom: 30px;
+    font-size: 12px; color: var(--muted); letter-spacing: .04em;
+  }
+
+  h1 { font-size: 34px; font-weight: 650; letter-spacing: -0.01em; }
+  h1 .thin { color: var(--muted); font-weight: 400; }
+  .lead { margin-top: 10px; font-size: 16.5px; color: var(--slate); max-width: 62ch; line-height: 1.45; }
+  .kicker { font-size: 12px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; color: var(--green); margin-bottom: 12px; }
+
+  /* Блок содержимого слайда. Класс grow растягивает его на всю оставшуюся высоту,
+     чтобы панели доходили до низа слайда и не оставляли пустой полосы. */
+  .body { margin-top: 30px; flex: 0 0 auto; }
+  .body.grow { flex: 1 1 auto; min-height: 0; }
+  .body.grow.stack { display: flex; flex-direction: column; }
+  .body.grow.stack > .cols, .body.grow.stack > .cards { flex: 1 1 auto; }
+
+  /* ---------- Обложка ---------- */
+  .cover { background: var(--ink); color: #fff; padding: 84px 72px; }
+  .cover .bar { width: 84px; height: 6px; background: var(--green); margin-bottom: 34px; }
+  .cover h1 { font-size: 60px; line-height: 1.08; font-weight: 640; letter-spacing: -0.02em; }
+  .cover .sub { margin-top: 22px; font-size: 22px; color: #cbd5e1; font-weight: 400; max-width: 30ch; line-height: 1.35; }
+  .cover .meta { position: absolute; left: 72px; bottom: 76px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .cover .meta span {
+    font-size: 13.5px; color: #e2e8f0; border: 1px solid #334155;
+    padding: 7px 14px; border-radius: 999px;
+  }
+  .cover .glyph {
+    position: absolute; right: 0; top: 0; height: 100%; width: 38%;
+    background:
+      repeating-linear-gradient(90deg, rgba(148,163,184,.13) 0 2px, transparent 2px 42px),
+      repeating-linear-gradient(0deg, rgba(148,163,184,.13) 0 2px, transparent 2px 42px);
+  }
+  .cover .glyph i {
+    position: absolute; display: block; border-radius: 3px;
+  }
+  .g1 { right: 92px; top: 150px; width: 210px; height: 26px; background: var(--green); opacity: .92; }
+  .g2 { right: 92px; top: 188px; width: 132px; height: 26px; background: var(--orange); opacity: .85; }
+  .g3 { right: 92px; top: 226px; width: 268px; height: 26px; background: var(--green); opacity: .55; }
+  .g4 { right: 92px; top: 264px; width: 88px; height: 26px; background: #64748b; opacity: .8; }
+  .g5 { right: 92px; top: 302px; width: 176px; height: 26px; background: var(--green); opacity: .75; }
+  .g6 { right: 92px; top: 340px; width: 240px; height: 26px; background: var(--orange); opacity: .5; }
+
+  /* ---------- Раскладки ---------- */
+  .cols { display: grid; gap: 26px; }
+  .c2 { grid-template-columns: 1fr 1fr; }
+  .c3 { grid-template-columns: 1fr 1fr 1fr; }
+  .c2-wide { grid-template-columns: 1.15fr 1fr; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; }
+  .panel h3 { font-size: 16.5px; font-weight: 640; margin-bottom: 12px; }
+  .panel.green { background: #f0fdf4; border-color: #bbf7d0; }
+  .panel.green h3 { color: #15803d; }
+  .panel.orange { background: #fff7ed; border-color: #fed7aa; }
+  .panel.orange h3 { color: #c2410c; }
+
+  ul { list-style: none; }
+  li { position: relative; padding-left: 18px; font-size: 15px; line-height: 1.5; color: var(--slate); margin-bottom: 9px; }
+  li::before { content: ""; position: absolute; left: 0; top: 8.5px; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  li b, li strong { color: var(--ink); font-weight: 620; }
+  li:last-child { margin-bottom: 0; }
+  .panel.green li::before { background: var(--green); }
+  .panel.orange li::before { background: var(--orange); }
+
+  code, .mono { font-family: "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace; font-size: 13px; }
+  code { background: #eef2f7; padding: 1.5px 6px; border-radius: 5px; color: #0f172a; }
+
+  /* ---------- Карточки возможностей ---------- */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .card {
+    border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; background: #fff;
+  }
+  .card .n { font-size: 12px; font-weight: 700; color: var(--green); letter-spacing: .08em; }
+  .card h4 { font-size: 17px; font-weight: 640; margin: 8px 0 7px; }
+  .card p { font-size: 14px; line-height: 1.45; color: var(--slate); }
+
+  /* ---------- Схема архитектуры ---------- */
+  .flow { display: flex; align-items: stretch; gap: 0; margin-top: 8px; }
+  .node {
+    flex: 1; border: 1px solid var(--line); border-radius: 14px; padding: 20px 20px 18px; background: #fff;
+  }
+  .node.dark { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .node.dark p, .node.dark .t2 { color: #cbd5e1; }
+  .node .t1 { font-size: 16.5px; font-weight: 640; }
+  .node .t2 { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .node p { font-size: 13.5px; line-height: 1.45; color: var(--slate); margin-top: 11px; }
+  .arrow { flex: 0 0 52px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 22px; }
+
+  /* ---------- Таблица ---------- */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 14px 12px; font-size: 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 650; }
+  td:first-child { width: 33%; }
+  td .mono { color: var(--ink); font-weight: 600; }
+  td.desc { color: var(--slate); }
+
+  /* ---------- Формулы ---------- */
+  .formula { border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; margin-bottom: 14px; background: #fff; }
+  .formula .name { font-size: 16px; font-weight: 640; margin-bottom: 9px; }
+  .formula .expr { font-size: 15px; color: var(--slate); line-height: 1.5; }
+  .formula .expr b { color: var(--ink); }
+  .frac { display: inline-flex; flex-direction: column; text-align: center; vertical-align: middle; margin: 0 4px; }
+  .frac .up { border-bottom: 1.5px solid var(--slate); padding: 0 8px 2px; }
+  .frac .down { padding: 2px 8px 0; }
+
+  .timebar { display: flex; height: 26px; border-radius: 6px; overflow: hidden; margin-top: 14px; border: 1px solid var(--line); }
+  .timebar div { display: flex; align-items: center; justify-content: center; font-size: 11.5px; color: #fff; font-weight: 600; }
+  .tb-work { background: var(--green); flex: 41; }
+  .tb-idle { background: var(--orange); flex: 24; }
+  .tb-off  { background: #94a3b8; flex: 35; }
+
+  /* ---------- Макет интерфейса ---------- */
+  .mockcol { display: flex; flex-direction: column; height: 100%; }
+  .mock { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff;
+          flex: 1 1 auto; display: flex; flex-direction: column; }
+  .mock .top { background: var(--ink); height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+  .mock .top i { width: 44px; height: 7px; border-radius: 3px; background: #475569; display: block; }
+  .mock .top i.on { background: var(--green); width: 56px; }
+  .mock .in { padding: 14px; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .kpi { border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; }
+  .kpi .v { font-size: 19px; font-weight: 680; }
+  .kpi .l { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+  .kpi .v.g { color: var(--green); }
+  .chartbox { border: 1px solid var(--line); border-radius: 8px; padding: 12px; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+  .chartbox .cap { font-size: 10.5px; color: var(--muted); margin-bottom: 8px; letter-spacing: .04em; }
+  .spark { display: flex; align-items: flex-end; gap: 6px; flex: 1 1 auto; min-height: 0; }
+  .spark span { flex: 1; border-radius: 2px 2px 0 0; background: var(--green-soft); position: relative; }
+  .spark span i { position: absolute; bottom: 0; left: 0; right: 0; background: var(--green); border-radius: 2px 2px 0 0; display: block; }
+  .rows { display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; justify-content: space-around; }
+  .row { display: flex; align-items: center; gap: 7px; }
+  .row .nm { width: 94px; font-size: 10.5px; color: var(--blue); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .tb { flex: 1; display: flex; height: 16px; border-radius: 3px; overflow: hidden; }
+
+  .note { margin-top: 20px; font-size: 13.5px; color: var(--muted); }
+  .note b { color: var(--slate); font-weight: 600; }
+
+  /* ---------- Цифры ---------- */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .stat { border: 1px solid var(--line); border-radius: 14px; padding: 20px; text-align: left; }
+  .stat .v { font-size: 34px; font-weight: 680; letter-spacing: -0.02em; }
+  .stat .l { font-size: 13px; color: var(--slate); margin-top: 6px; line-height: 1.35; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip { font-size: 12.5px; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 12px; color: var(--slate); }
+  .chip b { color: var(--ink); font-weight: 620; }
+
+  /* ---------- Шаги ---------- */
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .step { border-top: 3px solid var(--green); padding-top: 14px; }
+  .step .n { font-size: 12px; font-weight: 700; color: var(--green); letter-spacing: .08em; }
+  .step h4 { font-size: 15.5px; font-weight: 640; margin: 7px 0 7px; }
+  .step p { font-size: 13.5px; line-height: 1.45; color: var(--slate); }
+  .step .mono { display: block; margin-top: 8px; color: var(--slate); font-size: 11.5px; line-height: 1.5; word-break: break-all; }
+
+  /* ---------- Финал ---------- */
+  .closing { background: var(--ink); color: #fff; padding: 76px 72px; }
+  .closing .bar { width: 84px; height: 6px; background: var(--green); margin-bottom: 30px; }
+  .closing h1 { font-size: 44px; line-height: 1.12; max-width: 20ch; }
+  .closing .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: auto; }
+  .closing .grid div { border-top: 1px solid #334155; padding-top: 16px; }
+  .closing .grid h4 { font-size: 15.5px; font-weight: 640; margin-bottom: 7px; }
+  .closing .grid p { font-size: 13.5px; color: #94a3b8; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<!-- 1. Обложка -->
+<section class="slide cover">
+  <div class="glyph">
+    <i class="g1"></i><i class="g2"></i><i class="g3"></i>
+    <i class="g4"></i><i class="g5"></i><i class="g6"></i>
+  </div>
+  <div class="bar"></div>
+  <h1>Мониторинг<br>станков</h1>
+  <div class="sub">Разбор выгрузок системы мониторинга и аналитика загрузки оборудования</div>
+  <div class="meta">
+    <span>Веб-приложение</span>
+    <span>FastAPI · React · PostgreSQL</span>
+    <span>Развёртывание в Docker</span>
+    <span>Сентябрь 2026</span>
+  </div>
+</section>
+
+<!-- 2. Задача -->
+<section class="slide">
+  <div class="kicker">Зачем</div>
+  <h1>Данные были, пользоваться ими было нельзя</h1>
+  <p class="lead">Система мониторинга отдаёт XML-выгрузки. Внутри есть всё, но в виде, пригодном
+    только для машины: длительности строками, станки — идентификаторами, данные продублированы
+    в двух разных методиках учёта.</p>
+
+  <div class="body grow cols c2">
+    <div class="panel orange">
+      <h3>Как было</h3>
+      <ul>
+        <li>Файл открывается текстовым редактором, поиск — глазами</li>
+        <li>Длительность записана как <code>PT6H52M37S</code>, сложить её вручную нельзя</li>
+        <li>Станок обозначен как <code>MDM-C19-002147500&amp;36</code> — без названия и цеха</li>
+        <li>В одном файле <b>два параллельных набора данных</b>, их нельзя складывать вместе</li>
+        <li>Выгрузки перекрываются по датам — при сведении за месяц часы задваиваются</li>
+        <li>Ответ на вопрос «какая загрузка у станка за месяц» — несколько часов ручной работы</li>
+      </ul>
+    </div>
+    <div class="panel green">
+      <h3>Что требовалось</h3>
+      <ul>
+        <li>Загрузка выгрузок через браузер, без доступа к серверу</li>
+        <li>Показатели сразу после загрузки, без подготовки данных</li>
+        <li>Разрезы: по станкам, состояниям, сменам, суткам</li>
+        <li>Понятные названия станков вместо идентификаторов</li>
+        <li>Просмотр как по отдельному файлу, так и по произвольному диапазону дат</li>
+        <li>Вход по логину, разделение прав: администратор и наблюдатель</li>
+        <li>Установка на внутренний сервер предприятия</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Что получилось -->
+<section class="slide">
+  <div class="kicker">Результат</div>
+  <h1>Что получилось</h1>
+  <p class="lead">Веб-приложение из трёх контейнеров: интерфейс, сервер приложения и база данных.
+    Разворачивается одной командой.</p>
+
+  <div class="body grow cards">
+    <div class="card">
+      <div class="n">01</div>
+      <h4>Загрузка выгрузок</h4>
+      <p>XML перетаскивается мышью. Повторная загрузка того же файла распознаётся и переспрашивает.
+        Исходники хранятся и доступны для скачивания.</p>
+    </div>
+    <div class="card">
+      <div class="n">02</div>
+      <h4>Аналитика</h4>
+      <p>Коэффициент загрузки, структура времени по группам состояний, динамика по суткам,
+        матрица «станок × сутки», таблица записей.</p>
+    </div>
+    <div class="card">
+      <div class="n">03</div>
+      <h4>Страница станка</h4>
+      <p>Паспорт, показатели за период, место в парке, структура времени, динамика по суткам,
+        разбивка по состояниям.</p>
+    </div>
+    <div class="card">
+      <div class="n">04</div>
+      <h4>Карточки оборудования</h4>
+      <p>Паспортные данные загружаются из Excel и подставляются вместо идентификаторов
+        во все отчёты.</p>
+    </div>
+    <div class="card">
+      <div class="n">05</div>
+      <h4>Фильтры и экспорт</h4>
+      <p>Период, методика учёта, смена, набор станков. Текущая выборка выгружается в CSV
+        одной кнопкой.</p>
+    </div>
+    <div class="card">
+      <div class="n">06</div>
+      <h4>Доступ и роли</h4>
+      <p>Вход по логину и паролю. Администратор загружает данные и ведёт пользователей,
+        остальные только смотрят.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. Архитектура -->
+<section class="slide">
+  <div class="kicker">Как устроено</div>
+  <h1>Архитектура</h1>
+  <p class="lead">Три контейнера в одной сети. Наружу смотрит только веб-сервер,
+    база данных и сервер приложения из внешней сети недоступны.</p>
+
+  <div class="body flow">
+    <div class="node">
+      <div class="t1">Браузер</div>
+      <div class="t2">React 18 · TypeScript</div>
+      <p>Интерфейс целиком на TypeScript, графики — Recharts. Сборка Vite, проверка типов
+        встроена в сборку образа.</p>
+    </div>
+    <div class="arrow">&rarr;</div>
+    <div class="node">
+      <div class="t1">nginx</div>
+      <div class="t2">HTTPS · статика · прокси</div>
+      <p>Терминирует TLS, отдаёт собранный интерфейс, проксирует <code>/api</code>.
+        Добавляет защитные заголовки, скрывает версии.</p>
+    </div>
+    <div class="arrow">&rarr;</div>
+    <div class="node dark">
+      <div class="t1">FastAPI</div>
+      <div class="t2">Python 3.12 · SQLAlchemy 2.0</div>
+      <p>Разбор XML и Excel, агрегации, выдача JSON, авторизация по JWT.
+        Работает от непривилегированного пользователя.</p>
+    </div>
+    <div class="arrow">&rarr;</div>
+    <div class="node">
+      <div class="t1">PostgreSQL</div>
+      <div class="t2">8 таблиц</div>
+      <p>Записи мониторинга, справочники состояний и смен, карточки оборудования,
+        пользователи, журнал загруженных файлов.</p>
+    </div>
+  </div>
+
+  <div class="body grow cols c3" style="margin-top:26px">
+    <div class="panel">
+      <h3>Где лежат данные</h3>
+      <ul>
+        <li><span class="mono">pgdata</span> — база данных</li>
+        <li><span class="mono">uploads</span> — исходные XML-файлы</li>
+        <li>Оба тома переживают пересборку контейнеров и входят в резервное копирование</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Что происходит при старте</h3>
+      <ul>
+        <li>Приложение дожидается готовности базы</li>
+        <li>Недостающие таблицы и колонки создаются автоматически</li>
+        <li>Администратор заводится из конфигурации при первом запуске</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Почему в контейнерах</h3>
+      <ul>
+        <li>Одинаковое окружение на любом сервере, версии библиотек зафиксированы</li>
+        <li>Запуск одной командой: <span class="mono">docker compose up -d --build</span></li>
+        <li>Автоматический перезапуск после перезагрузки сервера</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Что внутри файла -->
+<section class="slide">
+  <div class="kicker">Данные</div>
+  <h1>Что внутри выгрузки</h1>
+  <p class="lead">Формат <span class="mono">XmlDataWrapper</span>: справочники и таблица фактов
+    в одном файле. Парсер приводит всё к плоским структурам и раскладывает по таблицам базы.</p>
+
+  <div class="body grow cols c2-wide">
+    <div>
+      <table>
+        <thead><tr><th>Секция</th><th>Что содержит</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mono">DateLastReplication</span></td><td class="desc">Когда выгрузка сформирована и за какой период</td></tr>
+          <tr><td><span class="mono">Machine</span></td><td class="desc">Станки: внутренний <span class="mono">ID</span> и <span class="mono">IntegrationID</span></td></tr>
+          <tr><td><span class="mono">MachineParam</span></td><td class="desc">Состояния: работа по программе, простой, наладка, авария — и цвет каждого</td></tr>
+          <tr><td><span class="mono">GroupParam</span></td><td class="desc">Группы состояний: Тмаш, Тпрос.орг, Тобсл…</td></tr>
+          <tr><td><span class="mono">rep_MonitoringByPriority</span></td><td class="desc">Основные данные: станок × состояние × сутки × смена и длительность</td></tr>
+          <tr><td><span class="mono">SheduleMeta / SheduleBase</span></td><td class="desc">Графики смен и их границы</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h3>Что пришлось разбирать отдельно</h3>
+      <ul>
+        <li><b>Длительности</b> в формате ISO-8601: <code>PT6H52M37S</code> → 24&nbsp;757 секунд</li>
+        <li><b>Цвета состояний</b> заданы знаковым числом .NET — переводятся в обычный цвет интерфейса</li>
+        <li><b>Идентификатор станка</b> <code>MDM-C19-002147500&amp;36</code> — склейка кода модели и номера в мониторинге</li>
+        <li><b>Защита при разборе:</b> внешние сущности и сетевые обращения отключены,
+          ограничения библиотеки не снимаются — подготовленный файл-бомба отвергается
+          за доли секунды</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Два набора данных -->
+<section class="slide">
+  <div class="kicker">Ключевой нюанс</div>
+  <h1>Два набора данных и два режима просмотра</h1>
+
+  <div class="body grow cols c2">
+    <div class="panel">
+      <h3>В файле две методики учёта одновременно</h3>
+      <ul>
+        <li><b>По графику смен</b> — учитывается только рабочее время смен</li>
+        <li><b>По календарным суткам</b> — все 24 часа, включая ночь и выходные</li>
+      </ul>
+      <p style="font-size:14.5px;color:var(--slate);line-height:1.5;margin-top:12px">
+        Это одни и те же события, посчитанные по-разному. Сложить их вместе — значит удвоить время.
+        В интерфейсе сделан явный переключатель <b>«Учёт времени»</b>, а не молчаливый выбор
+        одного из наборов.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Просмотр по файлу или по датам</h3>
+      <ul>
+        <li><b>По файлу</b> — показывается ровно содержимое выбранной выгрузки</li>
+        <li><b>По датам</b> — произвольный диапазон поверх всех загруженных файлов</li>
+      </ul>
+      <p style="font-size:14.5px;color:var(--slate);line-height:1.5;margin-top:12px">
+        Выгрузки перекрываются по периодам. На каждые сутки берутся данные <b>самой свежей</b>
+        выгрузки, которая эти сутки содержит — задвоения исключены. В интерфейсе видно,
+        какие сутки из какого файла взяты.</p>
+    </div>
+  </div>
+
+  <div class="body" style="margin-top:24px">
+    <div style="font-size:12.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:650;margin-bottom:10px">Перекрытие выгрузок и выбор источника</div>
+    <div style="position:relative;height:96px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px">
+      <div style="position:absolute;left:16px;top:16px;height:20px;width:44%;background:#cbd5e1;border-radius:5px;display:flex;align-items:center;padding:0 10px;font-size:11px;color:#334155">Выгрузка от 05.09 &nbsp;· 01.09 — 08.09</div>
+      <div style="position:absolute;left:30%;top:42px;height:20px;width:46%;background:#a5b4fc;border-radius:5px;display:flex;align-items:center;padding:0 10px;font-size:11px;color:#1e1b4b">Выгрузка от 12.09 &nbsp;· 05.09 — 15.09</div>
+      <div style="position:absolute;left:52%;top:68px;height:20px;width:42%;background:var(--green);border-radius:5px;display:flex;align-items:center;padding:0 10px;font-size:11px;color:#fff">Выгрузка от 17.09 &nbsp;· 09.09 — 17.09</div>
+    </div>
+    <div class="note" style="margin-top:12px">За сутки 05.09—08.09 берётся выгрузка от 12.09, за 09.09 и далее — от 17.09. Каждые сутки попадают в отчёт ровно один раз.</div>
+  </div>
+</section>
+
+<!-- 7. Показатели -->
+<section class="slide">
+  <div class="kicker">Методика</div>
+  <h1>Как считаются показатели</h1>
+  <p class="lead">Каждый процент в интерфейсе подписан: что делится на что. Числитель и знаменатель
+    видны рядом с цифрой, чтобы показатель можно было проверить.</p>
+
+  <div class="body grow cols c2-wide">
+    <div>
+      <div class="formula">
+        <div class="name">Коэффициент загрузки</div>
+        <div class="expr">
+          <span class="frac"><span class="up">время в состоянии «Работа по программе» (код <b>0101</b>)</span><span class="down">всё учтённое время за период</span></span>
+        </div>
+      </div>
+      <div class="formula">
+        <div class="name">Загрузка при включённом станке</div>
+        <div class="expr">
+          <span class="frac"><span class="up">время в состоянии «Работа по программе»</span><span class="down">учтённое время &minus; «Выключено» &minus; «Нет данных» (<b>0001</b>, <b>0002</b>)</span></span>
+        </div>
+      </div>
+      <div class="formula" style="margin-bottom:0">
+        <div class="name">Простои</div>
+        <div class="expr">Всё остальное время: наладка, отсутствие задания, авария, ремонт,
+          организационные простои. Разложено по группам состояний из самой выгрузки.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Структура суток станка</h3>
+      <div class="timebar">
+        <div class="tb-work">Работа 41%</div>
+        <div class="tb-idle">Простой 24%</div>
+        <div class="tb-off">Выключено 35%</div>
+      </div>
+      <p style="font-size:14px;color:var(--slate);line-height:1.5;margin-top:16px">
+        Коэффициент загрузки в этом примере — <b>41%</b>: работа делится на все 24 часа.
+        Загрузка при включённом станке — <b>63%</b>: те же часы работы делятся только
+        на время, когда станок был включён.</p>
+      <p style="font-size:14px;color:var(--slate);line-height:1.5;margin-top:12px">
+        Два показателя отвечают на разные вопросы: первый — насколько занято оборудование
+        в целом, второй — насколько эффективно используется смена, когда станок работает.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8. Карточки оборудования -->
+<section class="slide">
+  <div class="kicker">Справочник</div>
+  <h1>Как идентификатор превращается в станок</h1>
+  <p class="lead">В выгрузке о станке известен только идентификатор интеграции. Паспортные данные
+    подгружаются из Excel и подставляются во все отчёты.</p>
+
+  <div class="body grow stack" style="margin-top:24px">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+      <div style="border:1px solid var(--line);border-radius:12px;padding:14px 20px;background:var(--panel)">
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Из XML</div>
+        <div class="mono" style="font-size:16px;font-weight:600">MDM-C19-002147500 &amp; 36</div>
+      </div>
+      <div style="color:var(--muted);font-size:22px">=</div>
+      <div style="border:1px solid #bbf7d0;background:#f0fdf4;border-radius:12px;padding:14px 20px">
+        <div style="font-size:11px;color:#15803d;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Код модели (MDM)</div>
+        <div class="mono" style="font-size:16px;font-weight:600">MDM-C19-002147500</div>
+      </div>
+      <div style="color:var(--muted);font-size:22px">+</div>
+      <div style="border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px;padding:14px 20px">
+        <div style="font-size:11px;color:#1d4ed8;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Номер в мониторинге</div>
+        <div class="mono" style="font-size:16px;font-weight:600">36</div>
+      </div>
+    </div>
+
+    <div class="cols c3">
+      <div class="panel green">
+        <h3>Точная привязка</h3>
+        <ul>
+          <li>Основной формат — выгрузка станков из системы мониторинга</li>
+          <li>В ней есть колонка <span class="mono">ID</span> — тот самый номер после <code>&amp;</code></li>
+          <li>Вместе с кодом MDM даёт однозначное соответствие, угадывать не нужно</li>
+        </ul>
+      </div>
+      <div class="panel orange">
+        <h3>Запасной формат</h3>
+        <ul>
+          <li>Таблица присвоения кодов MDM: инвентарный номер и код, колонки <span class="mono">ID</span> нет</li>
+          <li>Код MDM общий для одинаковых моделей — у 15 станков одной модели он один</li>
+          <li>Карточки раскладываются по порядку и <b>помечаются как предположительные</b>, станок правится вручную</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Что это даёт</h3>
+        <ul>
+          <li>Ключ карточки — инвентарный номер: <span class="mono">2868</span>, <span class="mono">00002868</span> и <span class="mono">0002868 (12 (80))</span> — один станок</li>
+          <li>Повторный импорт обновляет карточки, а не плодит дубли</li>
+          <li>Съехавшие заголовки в выгрузке распознаются по содержимому колонок</li>
+          <li><b>Логины и пароли доступа к станкам из файла не читаются и в базу не попадают</b></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 9. Интерфейс -->
+<section class="slide">
+  <div class="kicker">Интерфейс</div>
+  <h1>Что видит пользователь</h1>
+
+  <div class="body grow cols c2" style="margin-top:26px">
+    <div class="mockcol">
+      <div style="font-size:12.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:650;margin-bottom:10px">Дашборд</div>
+      <div class="mock">
+        <div class="top"><i class="on"></i><i></i><i></i></div>
+        <div class="in">
+          <div class="kpis">
+            <div class="kpi"><div class="v g">41,3%</div><div class="l">Коэффициент загрузки</div></div>
+            <div class="kpi"><div class="v">63,1%</div><div class="l">При включённом станке</div></div>
+            <div class="kpi"><div class="v">1 284 ч</div><div class="l">Работа по программе</div></div>
+            <div class="kpi"><div class="v">36</div><div class="l">Станков в выборке</div></div>
+          </div>
+          <div class="chartbox">
+            <div class="cap">ДИНАМИКА ПО СУТКАМ</div>
+            <div class="spark">
+              <span style="height:82%"><i style="height:46%"></i></span>
+              <span style="height:88%"><i style="height:58%"></i></span>
+              <span style="height:86%"><i style="height:52%"></i></span>
+              <span style="height:90%"><i style="height:61%"></i></span>
+              <span style="height:84%"><i style="height:49%"></i></span>
+              <span style="height:38%"><i style="height:6%"></i></span>
+              <span style="height:34%"><i style="height:4%"></i></span>
+              <span style="height:87%"><i style="height:55%"></i></span>
+              <span style="height:91%"><i style="height:66%"></i></span>
+              <span style="height:85%"><i style="height:51%"></i></span>
+              <span style="height:89%"><i style="height:59%"></i></span>
+              <span style="height:40%"><i style="height:7%"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="note" style="margin-top:12px;font-size:13px">Показатели, структура времени по группам,
+        динамика по суткам, матрица «станок × сутки», таблица записей и экспорт в CSV.</div>
+    </div>
+
+    <div class="mockcol">
+      <div style="font-size:12.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:650;margin-bottom:10px">Станки — переход на страницу станка</div>
+      <div class="mock">
+        <div class="top"><i></i><i class="on"></i><i></i></div>
+        <div class="in">
+          <div class="chartbox">
+            <div class="cap">СТРУКТУРА ВРЕМЕНИ ПО КАЖДОМУ СТАНКУ, ЧАСЫ</div>
+            <div class="rows">
+              <div class="row"><span class="nm">MCV 800 #12</span><span class="tb"><i style="flex:58;background:#16a34a"></i><i style="flex:18;background:#f97316"></i><i style="flex:24;background:#cbd5e1"></i></span></div>
+              <div class="row"><span class="nm">DMU 50 #04</span><span class="tb"><i style="flex:47;background:#16a34a"></i><i style="flex:26;background:#f97316"></i><i style="flex:27;background:#cbd5e1"></i></span></div>
+              <div class="row"><span class="nm">1К62 #21</span><span class="tb"><i style="flex:39;background:#16a34a"></i><i style="flex:22;background:#f97316"></i><i style="flex:39;background:#cbd5e1"></i></span></div>
+              <div class="row"><span class="nm">HAAS VF-2 #07</span><span class="tb"><i style="flex:34;background:#16a34a"></i><i style="flex:31;background:#f97316"></i><i style="flex:35;background:#cbd5e1"></i></span></div>
+              <div class="row"><span class="nm">MCV 800 #15</span><span class="tb"><i style="flex:28;background:#16a34a"></i><i style="flex:19;background:#f97316"></i><i style="flex:53;background:#cbd5e1"></i></span></div>
+              <div class="row"><span class="nm">2Н135 #33</span><span class="tb"><i style="flex:21;background:#16a34a"></i><i style="flex:24;background:#f97316"></i><i style="flex:55;background:#cbd5e1"></i></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="note" style="margin-top:12px;font-size:13px">Название станка — ссылка. Открывается его страница:
+        паспорт из карточки, показатели за период, место в парке, динамика по суткам и разбивка по состояниям.
+        Фильтры переносятся вместе со ссылкой.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 10. Безопасность -->
+<section class="slide">
+  <div class="kicker">Безопасность</div>
+  <h1>Проверено до ввода в эксплуатацию</h1>
+  <p class="lead">Проведён аудит с попытками реальных атак: подмена роли в токене, подбор пароля,
+    XML-бомба, обход каталога, инъекции. Найденные слабые места закрыты и перепроверены.</p>
+
+  <div class="body grow cols c3">
+    <div class="panel">
+      <h3>Доступ</h3>
+      <ul>
+        <li>Пароли — bcrypt, минимум 8 символов</li>
+        <li>Роль берётся из базы, а не из токена: подменённый токен прав не даёт</li>
+        <li>Отключение пользователя обрывает его сессию немедленно</li>
+        <li>Система не может остаться без администратора</li>
+        <li>10 неудачных попыток входа за 5 минут — и вход блокируется</li>
+        <li>Ответ на несуществующий логин занимает столько же времени, сколько на существующий</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Приём данных</h3>
+      <ul>
+        <li>XML: внешние сущности и сетевые обращения отключены</li>
+        <li>Размер загрузки проверяется до разбора — переполнить память файлом нельзя</li>
+        <li>Имя файла очищается, на диск кладётся под своим именем: выход за каталог закрыт</li>
+        <li>Экспорт в CSV экранирует ячейки, чтобы данные из чужого файла не выполнились в Excel</li>
+        <li>Все запросы к базе параметризованы</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Инфраструктура</h3>
+      <ul>
+        <li>Сервер приложения работает не от root</li>
+        <li>Защитные заголовки браузера, версии ПО скрыты</li>
+        <li>База данных наружу не публикуется</li>
+        <li>Служебная документация API на боевом сервере выключена</li>
+        <li>Обязательный HTTPS, перенаправление с 80 порта</li>
+        <li>Зависимости обновлены: проверки <span class="mono">pip-audit</span> и <span class="mono">npm audit</span> чисты</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 11. Технологии -->
+<section class="slide">
+  <div class="kicker">Состав</div>
+  <h1>Технологии и объём работы</h1>
+
+  <div class="body stats">
+    <div class="stat"><div class="v">20</div><div class="l">модулей серверной части,<br>около 3 000 строк</div></div>
+    <div class="stat"><div class="v">47</div><div class="l">файлов интерфейса на TypeScript,<br>около 4 800 строк</div></div>
+    <div class="stat"><div class="v">28</div><div class="l">методов API:<br>данные, файлы, оборудование, пользователи</div></div>
+    <div class="stat"><div class="v">8</div><div class="l">таблиц базы данных<br>с автоматической миграцией при старте</div></div>
+  </div>
+
+  <div class="body grow cols c2" style="margin-top:28px">
+    <div class="panel">
+      <h3>Серверная часть</h3>
+      <div class="chips">
+        <span class="chip"><b>Python</b> 3.12</span>
+        <span class="chip"><b>FastAPI</b> 0.141</span>
+        <span class="chip"><b>SQLAlchemy</b> 2.0</span>
+        <span class="chip"><b>PostgreSQL</b> 16</span>
+        <span class="chip"><b>lxml</b> — разбор XML</span>
+        <span class="chip"><b>openpyxl</b> — чтение Excel</span>
+        <span class="chip"><b>PyJWT</b> · <b>bcrypt</b></span>
+      </div>
+      <p style="font-size:14px;color:var(--slate);line-height:1.5;margin-top:14px">
+        Записи мониторинга хранятся в подготовленном для отчётов виде: сводка за период
+        собирается одним запросом к базе, без обработки файлов на лету.</p>
+      <p style="font-size:14px;color:var(--slate);line-height:1.5;margin-top:12px">
+        Весь код прокомментирован обычным языком: что делает модуль и зачем,
+        без предположения о знакомстве с предметной областью.</p>
+    </div>
+    <div class="panel">
+      <h3>Интерфейс</h3>
+      <div class="chips">
+        <span class="chip"><b>React</b> 18</span>
+        <span class="chip"><b>TypeScript</b> 5.9</span>
+        <span class="chip"><b>Vite</b> 8</span>
+        <span class="chip"><b>Recharts</b> — графики</span>
+        <span class="chip">адаптивная вёрстка 320&ndash;1440 px</span>
+      </div>
+      <p style="font-size:14px;color:var(--slate);line-height:1.5;margin-top:14px">
+        Типы ответов сервера описаны в одном месте и используются всем интерфейсом.
+        Проверка типов встроена в сборку образа: расхождение роняет сборку,
+        а не всплывает у пользователя.</p>
+      <p style="font-size:14px;color:var(--slate);line-height:1.5;margin-top:12px">
+        Код разложен по назначению: клиент API, типы, вспомогательные функции,
+        компоненты, экраны и стили — каждый в своём файле.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 12. Развёртывание -->
+<section class="slide">
+  <div class="kicker">Эксплуатация</div>
+  <h1>Развёртывание на сервере предприятия</h1>
+  <p class="lead">Инструкция на 13 разделов: от требований к серверу до резервного копирования,
+    обновления версии и разбора типичных ошибок.</p>
+
+  <div class="body steps">
+    <div class="step">
+      <div class="n">ШАГ 1</div>
+      <h4>Настройки</h4>
+      <p>Скопировать пример конфигурации, задать свои пароли и случайный ключ подписи токенов.</p>
+      <span class="mono">cp .env.example .env</span>
+    </div>
+    <div class="step">
+      <div class="n">ШАГ 2</div>
+      <h4>Сертификат</h4>
+      <p>Положить сертификат и ключ организации. Для внутреннего контура подойдёт и самоподписанный.</p>
+      <span class="mono">deploy/certs/</span>
+    </div>
+    <div class="step">
+      <div class="n">ШАГ 3</div>
+      <h4>Запуск</h4>
+      <p>Одна команда собирает образы и поднимает все три контейнера с автозапуском.</p>
+      <span class="mono">docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build</span>
+    </div>
+    <div class="step">
+      <div class="n">ШАГ 4</div>
+      <h4>Первый вход</h4>
+      <p>Зайти администратором, сменить пароль, завести пользователей, загрузить первую выгрузку.</p>
+      <span class="mono">https://сервер/</span>
+    </div>
+  </div>
+
+  <div class="body grow cols c3" style="margin-top:28px">
+    <div class="panel">
+      <h3>Боевой режим</h3>
+      <ul>
+        <li>HTTPS с перенаправлением с 80 порта</li>
+        <li>Порт сервера приложения наружу закрыт</li>
+        <li>Автоперезапуск контейнеров, ротация логов</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Резервное копирование</h3>
+      <ul>
+        <li>Дамп базы и архив исходных XML</li>
+        <li>Готовые команды выгрузки и восстановления</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Обновление</h3>
+      <ul>
+        <li>Забрать новую версию, пересобрать — данные в томах остаются</li>
+        <li>Схема базы доводится автоматически при старте</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 13. Ограничения -->
+<section class="slide">
+  <div class="kicker">Честно о границах</div>
+  <h1>Ограничения и развитие</h1>
+  <p class="lead">Решения, принятые осознанно: они упрощают эксплуатацию сейчас,
+    но их стоит знать заранее.</p>
+
+  <div class="body grow cols c2">
+    <div class="panel orange">
+      <h3>О чём стоит знать</h3>
+      <ul>
+        <li>Токен живёт 12 часов и не отзывается: выход из системы удаляет его только в браузере
+          (отключение пользователя — аннулирует сразу)</li>
+        <li>Счётчик попыток входа живёт в памяти процесса: при нескольких копиях приложения
+          понадобится общее хранилище</li>
+        <li>Любой вошедший пользователь может скачать исходный XML и выгрузить CSV —
+          данные считаются доступными всем, у кого есть доступ</li>
+        <li>Журнал действий пользователей не ведётся, в логах только неудачные входы</li>
+      </ul>
+    </div>
+    <div class="panel green">
+      <h3>Что можно добавить дальше</h3>
+      <ul>
+        <li>Автоматический приём выгрузок по расписанию — без ручной загрузки файла</li>
+        <li>Права на уровне цехов: пользователь видит только своё оборудование</li>
+        <li>Журнал действий и отзыв выданных токенов</li>
+        <li>Регулярные отчёты на почту: сводка за смену, неделю, месяц</li>
+        <li>Плановые показатели и отклонение факта от плана</li>
+        <li>Уведомления о простоях сверх нормы</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 14. Финал -->
+<section class="slide closing">
+  <div class="bar"></div>
+  <h1>Выгрузка превращается в отчёт за минуту</h1>
+  <div class="grid">
+    <div>
+      <h4>Данные под контролем</h4>
+      <p>Две методики учёта разделены, перекрывающиеся выгрузки не задваиваются,
+        каждый процент подписан формулой.</p>
+    </div>
+    <div>
+      <h4>Понятно без обучения</h4>
+      <p>Вместо идентификаторов — названия станков из карточек, по клику открывается
+        страница станка с паспортом и показателями.</p>
+    </div>
+    <div>
+      <h4>Готово к серверу</h4>
+      <p>HTTPS, роли, проверенная безопасность, резервное копирование
+        и пошаговая инструкция развёртывания.</p>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,102 @@
+/* Адаптив: правила подключаются последними и перекрывают базовые */
+
+@media (max-width: 1100px) {
+  .app-header {
+    flex-wrap: wrap;
+    gap: 12px 18px;
+    padding: 12px 16px;
+  }
+
+  .app-nav {
+    order: 3;
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .app-user {
+    margin-left: auto;
+  }
+
+  .app-main {
+    padding: 16px;
+  }
+
+  .filters-row .btn {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 13px;
+  }
+
+  .app-main {
+    padding: 12px;
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .filters,
+  .card-head,
+  .card-body {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .filters {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .filters-row {
+    gap: 10px;
+  }
+
+  .segmented,
+  .filters-row .btn {
+    width: 100%;
+  }
+
+  .segmented {
+    justify-content: stretch;
+  }
+
+  .segmented button {
+    flex: 1;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+  }
+
+  .tabs.big {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .card-head {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .breakdown-name em {
+    display: none;
+  }
+
+  .table {
+    font-size: 12px;
+  }
+
+  .table .ellipsis {
+    max-width: 150px;
+  }
+}
+
+@media (max-width: 640px) {
+  .formulas .formula {
+    white-space: normal;
+  }
+}

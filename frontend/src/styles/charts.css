@@ -1,0 +1,95 @@
+/* Графики и структура времени по группам */
+
+/* ---------- структура по группам ---------- */
+
+.breakdown-bar {
+  display: flex;
+  height: 40px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.breakdown-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 2px;
+  transition: filter 0.15s;
+}
+
+.breakdown-seg:hover {
+  filter: brightness(1.08);
+}
+
+.breakdown-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.breakdown-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.breakdown-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.breakdown-list li:last-child {
+  border-bottom: none;
+}
+
+.breakdown-list .dot {
+  margin: 0;
+  flex: none;
+  transform: translateY(1px);
+}
+
+.breakdown-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.breakdown-name strong {
+  font-weight: 600;
+}
+
+.breakdown-name em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.breakdown-hours,
+.breakdown-share {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.breakdown-hours {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.breakdown-share {
+  font-weight: 650;
+  min-width: 58px;
+  text-align: right;
+}

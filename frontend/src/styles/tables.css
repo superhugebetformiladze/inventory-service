@@ -1,0 +1,178 @@
+/* Таблицы и тепловая карта */
+
+/* ---------- таблицы ---------- */
+
+.table-wrap {
+  overflow: auto;
+}
+
+.table-wrap.tall {
+  max-height: 560px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.table tr:hover td {
+  background: #f8fafc;
+}
+
+.table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table .strong {
+  font-weight: 600;
+}
+
+.table .muted {
+  color: var(--muted);
+}
+
+.table .mono {
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+}
+
+.table .ellipsis {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table .bar-col {
+  width: 140px;
+}
+
+.table input {
+  padding: 6px 9px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sub.error {
+  color: var(--danger);
+}
+
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.mini-bar {
+  background: var(--bg);
+  border-radius: 999px;
+  height: 7px;
+  overflow: hidden;
+}
+
+.mini-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.status {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.status-ok {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-error {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.status-off {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* ---------- тепловая карта ---------- */
+
+.heatmap-scroll {
+  overflow: auto;
+  max-height: 520px;
+}
+
+.heatmap {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 11px;
+}
+
+.heatmap th {
+  color: var(--muted);
+  font-weight: 600;
+  padding: 2px 4px;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 2;
+}
+
+.heatmap .sticky {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  text-align: left;
+  white-space: nowrap;
+  padding-right: 10px;
+  z-index: 3;
+}
+
+.heat-cell {
+  width: 30px;
+  height: 24px;
+  text-align: center;
+  border-radius: 4px;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}

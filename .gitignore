@@ -1,0 +1,34 @@
+# Секреты и локальные настройки
+.env
+.env.local
+
+# Сертификаты TLS — только на сервере
+deploy/certs/*
+!deploy/certs/.gitkeep
+
+# Бэкапы
+backups/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+*.log
+
+# Рабочие выгрузки и таблицы оборудования: содержат данные предприятия,
+# а в выгрузке станков ещё и логины с паролями доступа к оборудованию
+sample_data/
+*.xlsx
+*.xlsm
+
+# Служебное
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

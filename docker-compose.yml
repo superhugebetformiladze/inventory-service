@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: xml_parser_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-xml}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xml}
+      POSTGRES_DB: ${POSTGRES_DB:-xml_parser}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-xml} -d ${POSTGRES_DB:-xml_parser}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: xml_parser_api
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-xml}:${POSTGRES_PASSWORD:-xml}@db:5432/${POSTGRES_DB:-xml_parser}
+      SECRET_KEY: ${SECRET_KEY:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      STORAGE_DIR: /data/uploads
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-30}
+      LOGIN_ATTEMPTS: ${LOGIN_ATTEMPTS:-10}
+      LOGIN_WINDOW_SECONDS: ${LOGIN_WINDOW_SECONDS:-300}
+      CORS_ORIGINS: ${CORS_ORIGINS:-[]}
+      ENABLE_DOCS: ${ENABLE_DOCS:-true}
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: xml_parser_web
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

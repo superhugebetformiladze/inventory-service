@@ -1,0 +1,8 @@
+# Проект разрабатывается на Windows, а разворачивается на Linux:
+# в репозитории держим LF, чтобы конфиги и скрипты не ломались на сервере.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.xlsx binary
+*.xml text eol=lf

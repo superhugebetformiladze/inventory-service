@@ -1,0 +1,8 @@
+/* Точка сборки стилей. Порядок важен: адаптив идёт последним. */
+@import './base.css';
+@import './layout.css';
+@import './tables.css';
+@import './charts.css';
+@import './feedback.css';
+@import './pages.css';
+@import './responsive.css';
