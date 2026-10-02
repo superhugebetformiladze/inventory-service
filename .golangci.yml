@@ -1,0 +1,44 @@
+version: "2"
+
+run:
+  timeout: 3m
+
+linters:
+  default: standard
+  enable:
+    # Ошибки, которые в Go молча теряются чаще всего.
+    - errcheck
+    - errorlint
+    - bodyclose
+    - rowserrcheck
+    - nilerr
+    # Контексты: без них не сработает инвариант I11 (таймаут у всего внешнего).
+    - contextcheck
+    - noctx
+    # Читаемость и мёртвый код.
+    - revive
+    - unconvert
+    - unparam
+    - misspell
+    # Безопасность.
+    - gosec
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true   # Комментарии к экспортируемому пишем на русском, revive их не понимает
+    gosec:
+      excludes:
+        - G104   # дублирует errcheck
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - unparam
+
+formatters:
+  enable:
+    - gofmt

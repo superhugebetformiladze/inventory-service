@@ -1,0 +1,16 @@
+# Съём показателей службы.
+#
+# Пятнадцать секунд — тот же интервал, с каким служба их пересчитывает: чаще
+# снимать нечего, реже — и всплеск в очереди публикации успеет начаться и
+# закончиться между двумя точками на графике.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: inventory
+    static_configs:
+      - targets: ["server:8080"]

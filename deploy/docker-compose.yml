@@ -1,0 +1,153 @@
+# Окружение разработки: служба, её база и лента.
+#
+# База своя и только своя — общая таблица на два сервиса убивает независимое
+# развёртывание, ради которого служба и вынесена отдельно (PLAN.md §1).
+#
+# Лента — Redpanda: совместима с Kafka по протоколу, но один бинарник вместо
+# JVM и ZooKeeper. Клиенты, инструменты и знания переносятся на настоящую
+# Kafka один в один, если понадобится.
+#
+# Служебные порты публикуются НА LOCALHOST, а не на всех интерфейсах.
+#
+# Причина: ни лента, ни её админский API, ни база, ни Grafana аутентификации
+# в разработке не спрашивают — и не должны, иначе разработка превращается в
+# возню с паролями. Но `ports: "19092:19092"` без адреса слушает 0.0.0.0, то
+# есть предъявляет всё это локальной сети. Проверено сканированием: с чужого
+# хоста `rpk cluster info` отдавал кластер и список тем, админский API —
+# состояние кластера, Grafana — панели, и всё это без единого пароля.
+#
+# Машина разработчика стоит в той же сети завода, что и рабочие станции.
+# Спасал только брандмауэр Windows, то есть одно нажатие «Разрешить».
+#
+# 8090 привязан иначе и намеренно: это единственный порт, чья работа —
+# принимать соединения с ДРУГИХ машин (агенты). Его адрес задаётся тем же
+# BIND_ADDR со своим значением по умолчанию.
+#
+# Нужен доступ из сети (проверить с телефона, подключить агент с соседней
+# машины) — BIND_ADDR=0.0.0.0 в .env. Осознанно и на время.
+
+name: inventory
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${POSTGRES_EXPOSED_PORT:-5433}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --memory=1G
+      - --overprovisioned
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092,EXTERNAL://localhost:19092
+    ports:
+      # Наружу — только внешний слушатель: изнутри compose ходят по redpanda:9092.
+      - "${BIND_ADDR:-127.0.0.1}:${KAFKA_EXPOSED_PORT:-19092}:19092"
+      - "${BIND_ADDR:-127.0.0.1}:${REDPANDA_ADMIN_PORT:-9644}:9644"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.dev
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      HTTP_ADDR: ":8080"
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      KAFKA_BROKERS: redpanda:9092
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      SILENCE_THRESHOLD: ${SILENCE_THRESHOLD:-168h}
+      SILENCE_INTERVAL: ${SILENCE_INTERVAL:-1h}
+    ports:
+      - "${BIND_ADDR:-0.0.0.0}:${HTTP_EXPOSED_PORT:-8090}:8080"
+    volumes:
+      - ..:/src
+      - go_mod:/go/pkg/mod
+      - go_build:/root/.cache/go-build
+    depends_on:
+      db:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Наблюдение за службой. За профилем: на машине разработчика оно нужно не
+  # всегда, а два лишних контейнера едят память постоянно.
+  #
+  #     docker compose --profile metrics up -d
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    profiles: ["metrics"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    profiles: ["metrics"]
+    environment:
+      # Вход без пароля — только для разработки, и держится это ровно на
+      # том, что порт выше привязан к localhost. Пока адрес был 0.0.0.0,
+      # утверждение «снаружи сеть не видна» было неверным: панели и список
+      # источников данных отдавались любому в сети завода без пароля.
+      #
+      # Роль Admin оставлена сознательно: форма входа выключена, другого
+      # способа попасть внутрь нет, а Viewer не даёт собрать разовый график
+      # при разборе. Ставка — на недоступность порта, не на роль. В рабочем
+      # окружении анонимный вход выключен (docker-compose.prod.yml).
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${GRAFANA_PORT:-3001}:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  prometheus_data:
+  grafana_data:
+  redpanda_data:
+  go_mod:
+  go_build:

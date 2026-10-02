@@ -1,0 +1,264 @@
+# Рабочее окружение службы инвентаризации.
+#
+# Отдельный файл, а не оверлей поверх разработческого. Оверлей наследует всё,
+# что в нём не перекрыто, и списки в Compose при слиянии СКЛАДЫВАЮТСЯ, а не
+# заменяются: в учётной системе именно так рабочая база осталась с портом,
+# открытым в сеть, а фронтенд — опубликованным на порт, который никто не
+# слушает. Здесь каждая строка — рабочая, и ничего не приезжает незаметно.
+#
+#   make prod-up          поднять
+#   make prod-migrate     накатить миграции (до запуска службы)
+#   make prod-token ...   выпустить токен раскатки
+#
+# Отличия от разработки, каждое по делу:
+#
+#   * служба — собранный бинарник, а не `go run` по смонтированным исходникам;
+#   * наружу открыт ОДИН порт — тот, по которому приходят агенты. База и лента
+#     в сеть не публикуются;
+#   * лента в рабочем режиме, без кэширования записи: иначе выключение
+#     питания теряет сообщения, уже отмеченные опубликованными;
+#   * топики заводятся шагом `topics` с правильными политиками, автосоздание
+#     выключено;
+#   * обмен с учётной системой — через общую сеть Docker, а не через порт.
+#     Лента без аутентификации, открытая в локальную сеть, — это способ для
+#     любого компьютера этой сети записать в карточки учёта что угодно;
+#   * журналы контейнеров ограничены по размеру: сервер работает годами, а
+#     журнал Docker по умолчанию растёт, пока не кончится диск.
+
+name: inventory
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+x-app: &app
+  # Имя отличается от разработческого (`inventory-server`, его даёт Compose
+  # по имени проекта) намеренно: одинаковое имя значило бы, что сборка
+  # рабочего образа на машине разработчика подменяет разработческий, и
+  # следующий `make up` запускает `go run` в образе без компилятора.
+  image: inventory-service:${APP_VERSION:-latest}
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  environment:
+    APP_ENV: prod
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    HTTP_ADDR: ":8080"
+    POSTGRES_HOST: db
+    POSTGRES_PORT: "5432"
+    POSTGRES_USER: ${POSTGRES_USER:?задайте POSTGRES_USER в .env.prod}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env.prod}
+    POSTGRES_DB: ${POSTGRES_DB:?задайте POSTGRES_DB в .env.prod}
+    KAFKA_BROKERS: inventory-redpanda:9092
+    ADMIN_TOKEN: ${ADMIN_TOKEN:?задайте ADMIN_TOKEN в .env.prod — без него не работает кнопка «Обновить сейчас»}
+    SILENCE_THRESHOLD: ${SILENCE_THRESHOLD:-168h}
+    SILENCE_INTERVAL: ${SILENCE_INTERVAL:-1h}
+    RETENTION_SNAPSHOTS: ${RETENTION_SNAPSHOTS:-}
+    RETENTION_OUTBOX: ${RETENTION_OUTBOX:-}
+    RETENTION_COMMANDS: ${RETENTION_COMMANDS:-}
+    ENROLL_BURST: ${ENROLL_BURST:-}
+  logging: *logging
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Контрольные суммы страниц: тихая порча диска обнаруживается при чтении,
+      # а не в день, когда из копии не восстановилось ничего.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    # Рабочий режим включается явно, а не отсутствием флага разработчика.
+    #
+    # Проверено на этом образе: и без `--mode dev-container` его встроенный
+    # redpanda.yaml оставляет developer_mode и write_caching_default включёнными.
+    # Кэширование записи подтверждает сообщение раньше, чем оно легло на диск,
+    # и выключение питания теряет то, что служба уже отметила опубликованным, —
+    # а повторно такое сообщение не отправит никто.
+    #
+    # Настройки применяются при каждом старте: redpanda.yaml живёт в слое
+    # образа, а не в томе, и пересоздание контейнера вернуло бы встроенные.
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        rpk redpanda mode production >/dev/null &&
+        rpk redpanda config set redpanda.write_caching_default false &&
+        rpk redpanda config set redpanda.auto_create_topics_enabled false &&
+        exec rpk redpanda start
+        --smp=1 --memory=1G --reserve-memory=0M
+        --overprovisioned --check=false
+        --kafka-addr=PLAINTEXT://0.0.0.0:9092
+        --advertise-kafka-addr=PLAINTEXT://inventory-redpanda:9092
+    # --smp=1 и 1G памяти: парк в тысячу машин — это сотни сообщений в час, а
+    # не в секунду. --overprovisioned: процессор делится с базой и службой, и
+    # без флага лента занимает ядро опросом вхолостую. --check=false: проверки
+    # настройки ядра рассчитаны на выделенное железо и в контейнере на общем
+    # сервере заведомо не пройдут — к надёжности записи это отношения не имеет.
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    networks:
+      default:
+        aliases: [inventory-redpanda]
+      feed:
+        aliases: [inventory-redpanda]
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    logging: *logging
+
+  # Топики заводятся явно и с настройками, а не автоматически.
+  #
+  # Автоматически заведённый топик получает политику по умолчанию — удаление
+  # записей через неделю. Для inventory.hosts.v1 это поломка контракта: он
+  # обещает последнюю запись по каждой машине навсегда, и на этом держится
+  # подъём нового потребителя с нуля. В разработке топик уплотняемый потому,
+  # что его однажды завели руками (`make topics`); на новом сервере руками не
+  # завёл бы никто. Поэтому шаг стоит в зависимостях службы и выполняется при
+  # каждом `up`, а автосоздание в ленте выключено: забытый топик — это громкая
+  # ошибка публикации, а не тихо неправильный топик.
+  #
+  # `create || true` сам по себе не годится: уже существующий топик с не той
+  # политикой он оставил бы как есть. Поэтому настройки выставляются отдельно
+  # и каждый раз.
+  topics:
+    image: redpandadata/redpanda:v24.2.7
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        B="-X brokers=inventory-redpanda:9092"
+        ensure() {
+          name="$$1"; shift
+          rpk topic create "$$name" -p 3 $$B >/dev/null 2>&1 || true
+          rpk topic alter-config "$$name" "$$@" $$B >/dev/null
+          echo "топик $$name: $$*"
+        }
+        ensure inventory.snapshots.v1 --set retention.ms=2592000000
+        ensure inventory.hosts.v1     --set cleanup.policy=compact
+        ensure inventory.events.v1    --set retention.ms=7776000000
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: "no"
+    logging: *logging
+
+  server:
+    <<: *app
+    command: ["server"]
+    ports:
+      # Единственный порт наружу: по нему приходят агенты. Административные
+      # маршруты на нём же и закрыты ключом ADMIN_TOKEN.
+      - "${HTTP_PORT:-8090}:8080"
+    networks:
+      default: {}
+      feed:
+        aliases: [inventory-server]
+    depends_on:
+      db:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      topics:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ready >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # Разовые команды. За профилем: запускаются руками и сразу завершаются.
+  #
+  #   docker compose ... run --rm migrate
+  #   docker compose ... run --rm agentctl token -label "раскатка" -days 14 -uses 600
+  migrate:
+    <<: *app
+    command: ["migrate"]
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  agentctl:
+    <<: *app
+    entrypoint: ["agentctl"]
+    command: ["list"]
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Наблюдение. Необязательно: без него служба работает, просто нет графиков.
+  # Состояние службы словами показывает и сама учётная система.
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    profiles: ["metrics"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    logging: *logging
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    profiles: ["metrics"]
+    environment:
+      # В разработке вход анонимный. Здесь — нет: графики раскрывают размер
+      # парка и характер его работы.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_ADMIN_USER: admin
+      # Пустая строка здесь означает пароль Grafana по умолчанию, то есть
+      # admin/admin на единственном порту, который этот профиль публикует.
+      #
+      # Требование `:?` на этом месте не годится: compose интерполирует файл
+      # целиком, независимо от профилей, и обязательная переменная ломала бы
+      # обычный `make prod-up` тем, кто графиками не пользуется вовсе
+      # (проверено). Поэтому проверка стоит в цели `prod-metrics` — там, где
+      # профиль и включается.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  db_data:
+  redpanda_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default: {}
+  # Общая сеть с учётной системой. Создаётся здесь, учётная система к ней
+  # подключается как к внешней, поэтому служба поднимается первой.
+  feed:
+    name: ${FEED_NETWORK:-inventory-feed}

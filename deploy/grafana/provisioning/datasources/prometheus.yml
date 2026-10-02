@@ -1,0 +1,12 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    # Постоянный uid: панели ссылаются на источник по нему, а сгенерированный
+    # меняется при пересоздании тома — и графики становятся пустыми без
+    # единого сообщения об ошибке.
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
