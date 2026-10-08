@@ -14,6 +14,7 @@ import { Alert, Card, Empty, Kpi, Loader } from '@/components/ui'
 import { formatDate, formatHours, formatPercent } from '@/lib/format'
 
 import { FilterBar } from './FilterBar'
+import { ProductionCard } from './ProductionCard'
 import { useDashboardData } from './useDashboardData'
 
 type Tab = 'params' | 'machines' | 'records'
@@ -140,6 +141,19 @@ export function DashboardPage() {
               <Empty>Нет данных</Empty>
             )}
           </Card>
+
+          <ProductionCard
+            dateFrom={
+              state.filters.scope === 'all' || !state.timeline.length
+                ? undefined
+                : state.timeline[0].date.slice(0, 10)
+            }
+            dateTo={
+              state.filters.scope === 'all' || !state.timeline.length
+                ? undefined
+                : state.timeline[state.timeline.length - 1].date.slice(0, 10)
+            }
+          />
 
           {state.heatmap && state.heatmap.cells.length > 0 && (
             <Card

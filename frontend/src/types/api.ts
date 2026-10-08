@@ -217,6 +217,8 @@ export interface FleetSummary {
 export interface MachineDetail {
   machine_key: string
   title: string
+  /** Границы периода, попавшего в выборку: по ним подбирается план и факт выпуска. */
+  period: { from: string | null; to: string | null }
   card: EquipmentCard | null
   totals: Totals
   by_group: GroupShare[]
@@ -228,7 +230,8 @@ export interface MachineDetail {
 
 /** Параметры выборки, общие для всех отчётов. */
 export interface DataQuery {
-  scope: 'file' | 'range'
+  /** file — одна выгрузка, range — диапазон дат, all — всё загруженное без границ. */
+  scope: 'file' | 'range' | 'all'
   file_id?: number | null
   date_from?: string
   date_to?: string
@@ -237,4 +240,124 @@ export interface DataQuery {
   machines?: string[]
   limit?: number
   offset?: number
+}
+
+/* ---------------------------------------------------------------------------
+ * Продукция: номенклатура, план и факт выпуска
+ * ------------------------------------------------------------------------- */
+
+export interface Product {
+  id: number
+  name: string
+  /** Название вместе с типом корпуса — как подписывать в списках. */
+  title: string
+  body_type: string | null
+  workshop: string | null
+  code: string | null
+  unit: string
+  notes: string | null
+  /** Станки, за которыми закреплено изделие. */
+  machines: string[]
+}
+
+export interface MachineLink {
+  id: number
+  machine_key: string
+  product_id: number
+  note: string | null
+}
+
+export interface ProductionReport {
+  id: number
+  original_name: string
+  period_from: string
+  period_to: string
+  rows_count: number
+  products_count: number
+  plan_total: number
+  fact_total: number
+  size_bytes: number
+  status: string
+  error: string | null
+  note: string | null
+  uploaded_by: string | null
+  uploaded_at: string
+}
+
+/** Отчёт о том, что получилось при загрузке рапорта. */
+export interface ReportImportSummary {
+  rows: number
+  products_created: number
+  products_matched: number
+  shops: string[]
+  plan_total: number
+  fact_total: number
+  /** Сверка суммы разобранных строк с итогом из файла. */
+  checks: string[]
+  warnings: string[]
+}
+
+export interface ProductionUploadResult {
+  report: ProductionReport
+  summary: ReportImportSummary
+}
+
+export interface ProductionRow {
+  id: number
+  report_id: number | null
+  product_id: number
+  product: string
+  body_type: string | null
+  unit: string
+  machine_key: string | null
+  period_from: string
+  period_to: string
+  plan_qty: number | null
+  fact_qty: number | null
+  return_qty: number | null
+  percent: number | null
+  workshop: string | null
+  note: string | null
+  source: 'file' | 'manual'
+}
+
+export interface ProductionTotals {
+  plan_qty: number
+  fact_qty: number
+  return_qty: number
+  percent: number | null
+  rows: number
+}
+
+export interface ProductShare extends ProductionTotals {
+  product_id: number
+  name: string
+  body_type: string | null
+  workshop: string | null
+  unit: string
+  manual: boolean
+  /** Сколько станков делят это изделие между собой. */
+  machines?: number
+}
+
+export interface WorkshopShare extends ProductionTotals {
+  workshop: string
+}
+
+export interface ProductionSummary {
+  totals: ProductionTotals
+  by_product: ProductShare[]
+  by_workshop: WorkshopShare[]
+  products_total: number
+  linked_machines: number
+}
+
+export interface MachineProduction {
+  machine_key: string
+  totals: ProductionTotals
+  products: ProductShare[]
+  /** Сколько изделий закреплено за станком. */
+  linked: number
+  /** Есть ли среди них те, что выпускаются не только на этом станке. */
+  shared: boolean
 }

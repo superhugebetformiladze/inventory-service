@@ -170,3 +170,119 @@ class EquipmentUpdate(BaseModel):
     notes: str | None = None
     import_note: str | None = None
     machine_key: str | None = None
+
+
+class ProductOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    title: str
+    body_type: str | None = None
+    workshop: str | None = None
+    code: str | None = None
+    unit: str = "шт."
+    notes: str | None = None
+    machines: list[str] = []
+
+
+class ProductCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    body_type: str | None = Field(default=None, max_length=255)
+    workshop: str | None = Field(default=None, max_length=128)
+    code: str | None = Field(default=None, max_length=64)
+    unit: str = Field(default="шт.", max_length=16)
+    notes: str | None = None
+
+
+class ProductUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    body_type: str | None = Field(default=None, max_length=255)
+    workshop: str | None = Field(default=None, max_length=128)
+    code: str | None = Field(default=None, max_length=64)
+    unit: str | None = Field(default=None, max_length=16)
+    notes: str | None = None
+
+
+class MachineLinkIn(BaseModel):
+    """Запрос «закрепить изделие за станком»."""
+
+    machine_key: str = Field(min_length=1, max_length=128)
+    product_id: int
+    note: str | None = None
+
+
+class MachineLinkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    machine_key: str
+    product_id: int
+    note: str | None = None
+
+
+class ProductionReportOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    original_name: str
+    period_from: date
+    period_to: date
+    rows_count: int
+    products_count: int
+    plan_total: float
+    fact_total: float
+    size_bytes: int
+    status: str
+    error: str | None = None
+    note: str | None = None
+    uploaded_by: str | None = None
+    uploaded_at: datetime
+
+
+class ProductionRowOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    report_id: int | None = None
+    product_id: int
+    product: str
+    body_type: str | None = None
+    unit: str = "шт."
+    machine_key: str | None = None
+    period_from: date
+    period_to: date
+    plan_qty: float | None = None
+    fact_qty: float | None = None
+    return_qty: float | None = None
+    percent: float | None = None
+    workshop: str | None = None
+    note: str | None = None
+    source: str = "file"
+
+
+class ProductionRowCreate(BaseModel):
+    """Ручной ввод плана и факта — когда рапорта нет или нужно уточнить по станку."""
+
+    product_id: int | None = None
+    # Если изделия ещё нет в справочнике, его можно завести прямо здесь
+    product_name: str | None = Field(default=None, max_length=255)
+    body_type: str | None = Field(default=None, max_length=255)
+    workshop: str | None = Field(default=None, max_length=128)
+    machine_key: str | None = Field(default=None, max_length=128)
+    period_from: date
+    period_to: date
+    plan_qty: float | None = Field(default=None, ge=0)
+    fact_qty: float | None = Field(default=None, ge=0)
+    return_qty: float | None = Field(default=None, ge=0)
+    note: str | None = None
+
+
+class ProductionRowUpdate(BaseModel):
+    machine_key: str | None = Field(default=None, max_length=128)
+    period_from: date | None = None
+    period_to: date | None = None
+    plan_qty: float | None = Field(default=None, ge=0)
+    fact_qty: float | None = Field(default=None, ge=0)
+    return_qty: float | None = Field(default=None, ge=0)
+    note: str | None = None

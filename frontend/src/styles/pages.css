@@ -53,6 +53,71 @@
   color: #92400e;
 }
 
+/* Мелкая пометка рядом с названием: «на 3 станках», «вручную» */
+.chip.small {
+  padding: 1px 7px;
+  font-size: 11px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Список станков, закреплённых за изделием, с кнопкой открепления */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.chip-row .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip-x {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.chip-x:hover {
+  color: var(--danger);
+}
+
+/* Строка с выбором периода над таблицами и формами загрузки */
+.period-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.period-row .sub {
+  padding-bottom: 6px;
+}
+
+/* Поля даты не должны растягиваться на всю строку — им хватает своей ширины */
+.period-row .field.inline {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.period-row input[type='date'] {
+  width: 165px;
+}
+
+.period-row input[type='text'],
+.period-row input:not([type]),
+.period-row select {
+  min-width: 190px;
+}
+
 .chart-link {
   fill: var(--text);
   cursor: pointer;
@@ -270,4 +335,42 @@
 .formulas .hint {
   margin-top: 0;
   margin-bottom: 12px;
+}
+
+/* ---------- страница «Продукция» ---------- */
+
+.production-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.production-page .page-head-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Фильтры в одну строку: даты фиксированной ширины, поиск забирает остаток.
+   Без этого поля «С» и «По» переносятся друг под друга и строка выглядит рваной. */
+.production-page .filters-row .field-group {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.production-page .filters-row .field.inline {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.production-page .filters-row input[type='date'] {
+  width: 160px;
+}
+
+.production-page .filters-row select {
+  min-width: 210px;
+}
+
+.production-page .filters-row .field.inline.grow {
+  flex: 1 1 220px;
 }

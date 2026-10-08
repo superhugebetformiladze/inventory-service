@@ -23,7 +23,7 @@ import type {
   SourceFile,
 } from '@/types/api'
 
-export type Scope = 'file' | 'range'
+export type Scope = 'file' | 'range' | 'all'
 
 export interface DashboardState {
   files: SourceFile[]
@@ -125,6 +125,8 @@ export function useDashboardData(): DashboardState & { filters: DashboardFilters
       machines: selectedMachines.length ? selectedMachines : undefined,
     }
     if (scope === 'file') return { ...base, file_id: fileId }
+    // «За всё время» — те же данные по датам, только без границ периода
+    if (scope === 'all') return base
     return {
       ...base,
       date_from: dateFrom ? `${dateFrom}T00:00:00` : undefined,

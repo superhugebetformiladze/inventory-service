@@ -2,7 +2,8 @@
  * Карта страниц приложения.
  *
  * Здесь написано, какой адрес какую страницу открывает: «/» — аналитика,
- * «/machine/…» — карточка станка, «/admin» — админка, «/login» — вход.
+ * «/machine/…» — карточка станка, «/production» — план и факт выпуска,
+ * «/admin» — админка, «/login» — вход.
  * Обёртка Protected не пускает дальше тех, кто не вошёл, а раздел админки —
  * ещё и тех, у кого нет прав администратора.
  */
@@ -14,6 +15,7 @@ import { AdminPage } from '@/features/admin/AdminPage'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { LoginPage } from '@/features/login/LoginPage'
 import { MachinePage } from '@/features/machine/MachinePage'
+import { ProductionPage } from '@/features/production/ProductionPage'
 
 import { Layout } from './Layout'
 
@@ -44,6 +46,7 @@ export function App() {
       >
         <Route path="/" element={<DashboardPage />} />
         <Route path="/machine/:machineKey" element={<MachinePage />} />
+        <Route path="/production" element={<ProductionPage />} />
         <Route
           path="/admin"
           element={

@@ -1,7 +1,8 @@
 """Отчёты: всё, что показывает клиентская часть.
 
 Общие для всех отчётов параметры выборки собирает build_query:
-  * scope=file — смотрим одну конкретную выгрузку, scope=range — диапазон дат по всем;
+  * scope=file — смотрим одну конкретную выгрузку, scope=range — диапазон дат по всем,
+    scope=all — всё загруженное без ограничения по датам;
   * schedule_type=1 — учитываем только время рабочих смен, =2 — календарные сутки;
   * shift — номер смены, machines — список станков.
 
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/api/data", tags=["data"])
 
 
 def build_query(
-    scope: str = Q("file", pattern="^(file|range)$"),
+    scope: str = Q("file", pattern="^(file|range|all)$"),
     file_id: int | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -39,6 +40,10 @@ def build_query(
 ) -> DataQuery:
     if scope == "file" and file_id is None:
         raise HTTPException(status_code=400, detail="Для режима «файл» нужен file_id")
+    if scope == "all":
+        # «За всё время» — это тот же разбор по датам, только без границ. Присланные
+        # даты отбрасываем, чтобы случайно оставшийся в адресе фильтр не сузил выборку.
+        date_from = date_to = None
     return DataQuery(
         scope=scope,
         file_id=file_id,

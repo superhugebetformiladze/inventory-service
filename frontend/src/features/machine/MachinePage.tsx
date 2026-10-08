@@ -2,7 +2,8 @@
  * Страница одного станка.
  *
  * Показывает паспорт из карточки оборудования и показатели этого станка за период:
- * загрузку, место в парке, структуру времени, динамику по суткам и разбивку по дням.
+ * загрузку, место в парке, структуру времени, динамику по суткам, разбивку по дням
+ * и выпуск продукции: что за станком закреплено, каков план и сколько сделано.
  *
  * Фильтры хранятся прямо в адресе страницы, поэтому ссылку можно отправить коллеге —
  * он увидит ровно тот же разрез данных.
@@ -10,15 +11,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 
-import { dataApi, filesApi } from '@/api'
+import { dataApi, filesApi, productionApi } from '@/api'
 import { GroupBreakdown, TimelineChart } from '@/components/charts'
 import { Formulas } from '@/components/Formulas'
 import { ParamTable } from '@/components/tables'
 import { Alert, Card, Empty, Kpi, Loader } from '@/components/ui'
 import { formatDate, formatHours, formatPercent } from '@/lib/format'
-import type { DataQuery, MachineDetail, SourceFile } from '@/types/api'
+import type { DataQuery, MachineDetail, MachineProduction, SourceFile } from '@/types/api'
 
 import { MachineDaysTable } from './MachineDaysTable'
+import { MachineProducts } from './MachineProducts'
 import { MachinePassport } from './MachinePassport'
 
 function message(error: unknown): string {
@@ -31,11 +33,13 @@ export function MachinePage() {
 
   const [files, setFiles] = useState<SourceFile[]>([])
   const [detail, setDetail] = useState<MachineDetail | null>(null)
+  const [production, setProduction] = useState<MachineProduction | null>(null)
+  const [productionLoading, setProductionLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   // Фильтры живут в адресной строке: ссылка на станок открывается в том же разрезе.
-  const scope = (search.get('scope') as 'file' | 'range') || 'file'
+  const scope = (search.get('scope') as 'file' | 'range' | 'all') || 'file'
   const fileId = search.get('file_id') || ''
   const scheduleType = search.get('schedule_type') || '1'
   const shift = search.get('shift') || ''
@@ -71,6 +75,8 @@ export function MachinePage() {
       shift: shift || undefined,
     }
     if (scope === 'file') return { ...base, file_id: fileId ? Number(fileId) : undefined }
+    // «За всё время» — без границ периода
+    if (scope === 'all') return base
     return { ...base, date_from: dateFrom || undefined, date_to: dateTo || undefined }
   }, [scope, fileId, scheduleType, shift, dateFrom, dateTo])
 
@@ -91,6 +97,27 @@ export function MachinePage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Продукция живёт своим периодом (план и факт заводятся за месяц), поэтому
+  // берём границы уже отобранных суток и просим выпуск ровно за них.
+  useEffect(() => {
+    const from = detail?.period?.from
+    const to = detail?.period?.to
+    if (!detail) {
+      setProduction(null)
+      return
+    }
+    setProductionLoading(true)
+    const allTime = scope === 'all'
+    productionApi
+      .machine(machineKey, {
+        date_from: allTime || !from ? undefined : from.slice(0, 10),
+        date_to: allTime || !to ? undefined : to.slice(0, 10),
+      })
+      .then(setProduction)
+      .catch(() => setProduction(null))
+      .finally(() => setProductionLoading(false))
+  }, [detail, machineKey, scope])
 
   function patch(key: string, value: string) {
     setSearch((current) => {
@@ -133,7 +160,12 @@ export function MachinePage() {
         </div>
 
         <div className="page-head-filters">
-          {scope === 'file' ? (
+          {scope === 'all' ? (
+            <div className="field inline">
+              <span>Период</span>
+              <div className="chip">все загруженные сутки</div>
+            </div>
+          ) : scope === 'file' ? (
             <label className="field inline">
               <span>Выгрузка</span>
               <select value={fileId} onChange={(event) => patch('file_id', event.target.value)}>
@@ -245,6 +277,13 @@ export function MachinePage() {
             ) : (
               <Empty>Нет данных за период</Empty>
             )}
+          </Card>
+
+          <Card
+            title="Продукция"
+            subtitle="выполнение = сделано ÷ план по каждому изделию, закреплённому за станком"
+          >
+            <MachineProducts data={production} loading={productionLoading} />
           </Card>
 
           <Card

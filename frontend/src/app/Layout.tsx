@@ -26,6 +26,9 @@ export function Layout() {
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
             Аналитика
           </NavLink>
+          <NavLink to="/production" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Продукция
+          </NavLink>
           {isAdmin && (
             <NavLink to="/admin" className={({ isActive }) => (isActive ? 'active' : '')}>
               Админка

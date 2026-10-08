@@ -1,7 +1,8 @@
 /**
  * Панель фильтров над отчётами.
  *
- * Здесь выбирают, что именно смотреть: одну выгрузку или диапазон дат, режим учёта
+ * Здесь выбирают, что именно смотреть: одну выгрузку, диапазон дат или всё загруженное
+ * сразу («за всё время»), а также режим учёта
  * времени (по графику смен или по календарным суткам), смену и конкретные станки.
  * Любое изменение сразу пересчитывает все отчёты на странице.
  */
@@ -64,9 +65,21 @@ export function FilterBar({ files, machines, availableShifts, filters, params }:
           >
             По датам
           </button>
+          <button
+            type="button"
+            className={scope === 'all' ? 'active' : ''}
+            onClick={() => setScope('all')}
+          >
+            За всё время
+          </button>
         </div>
 
-        {scope === 'file' ? (
+        {scope === 'all' ? (
+          <div className="field inline grow">
+            <span>Период</span>
+            <div className="chip">все загруженные сутки</div>
+          </div>
+        ) : scope === 'file' ? (
           <label className="field inline grow">
             <span>Выгрузка</span>
             <select
@@ -143,6 +156,12 @@ export function FilterBar({ files, machines, availableShifts, filters, params }:
         <p className="hint">
           В режиме «по датам» за каждые сутки берётся самая свежая выгрузка — пересечения
           периодов не задваиваются.
+        </p>
+      )}
+      {scope === 'all' && (
+        <p className="hint">
+          Показаны все загруженные сутки без ограничения по датам. За каждые сутки берётся
+          самая свежая выгрузка, поэтому перекрытия периодов не задваиваются.
         </p>
       )}
       {scope === 'file' && currentFile && (

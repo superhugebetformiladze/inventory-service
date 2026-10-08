@@ -10,7 +10,10 @@
   * FileMachine / FileGroup / FileParam — справочники из конкретного файла;
   * MonitoringRecord — главные данные: сколько времени станок провёл в каждом состоянии;
   * Shift           — графики смен из файла;
-  * EquipmentCard   — паспорт станка: инвентарный номер, модель, IP и прочее.
+  * EquipmentCard   — паспорт станка: инвентарный номер, модель, IP и прочее;
+  * Product         — номенклатура: что производим;
+  * MachineProduct  — какое изделие делают на каком станке;
+  * ProductionReport / ProductionRow — план и факт выпуска за период.
 """
 
 from datetime import date, datetime
@@ -26,6 +29,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -222,3 +226,130 @@ class EquipmentCard(Base):
             return self.display_name
         parts = [self.model or self.name or "", "№{0}".format(self.inv_number) if self.inv_number else ""]
         return " ".join(part for part in parts if part).strip() or (self.machine_key or "")
+
+
+class Product(Base):
+    """Номенклатура: изделие, которое выпускает производство.
+
+    Заводится при загрузке рапорта или руками в админке. Одно и то же изделие в
+    рапорте всегда описано парой «название + тип корпуса» и принадлежит цеху,
+    поэтому ключом служит их сочетание (match_key) — повторная загрузка рапорта
+    находит уже заведённое изделие, а не создаёт двойник.
+    """
+
+    __tablename__ = "products"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_key: Mapped[str] = mapped_column(String(600), unique=True, index=True)
+
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    body_type: Mapped[str | None] = mapped_column(String(255))
+    workshop: Mapped[str | None] = mapped_column(String(128), index=True)
+    code: Mapped[str | None] = mapped_column(String(64))
+    unit: Mapped[str] = mapped_column(String(16), default="шт.")
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now())
+
+    @property
+    def title(self) -> str:
+        """Как подписывать изделие в списках."""
+        if self.body_type and self.body_type != self.name:
+            return "{0} · {1}".format(self.name, self.body_type)
+        return self.name
+
+
+class MachineProduct(Base):
+    """Какое изделие делают на каком станке.
+
+    В рапорте станков нет — он составляется по цехам, поэтому связь заводится
+    вручную в админке. Один станок может делать несколько изделий, и одно изделие
+    может выпускаться на нескольких станках.
+    """
+
+    __tablename__ = "machine_products"
+    __table_args__ = (
+        UniqueConstraint("machine_key", "product_id", name="uq_machine_product"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    machine_key: Mapped[str] = mapped_column(String(128), index=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True
+    )
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    product: Mapped["Product"] = relationship(lazy="joined")
+
+
+class ProductionReport(Base):
+    """Загруженный рапорт: «Справка о выполнении плана производства».
+
+    В самом файле периода нет, поэтому его указывает тот, кто загружает файл.
+    """
+
+    __tablename__ = "production_reports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    original_name: Mapped[str] = mapped_column(String(512))
+    stored_name: Mapped[str | None] = mapped_column(String(512))
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+
+    period_from: Mapped[date] = mapped_column(Date, index=True)
+    period_to: Mapped[date] = mapped_column(Date, index=True)
+
+    rows_count: Mapped[int] = mapped_column(Integer, default=0)
+    products_count: Mapped[int] = mapped_column(Integer, default=0)
+    plan_total: Mapped[float] = mapped_column(Float, default=0.0)
+    fact_total: Mapped[float] = mapped_column(Float, default=0.0)
+
+    status: Mapped[str] = mapped_column(String(16), default="ok")
+    error: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+
+    uploaded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    uploaded_by: Mapped["User | None"] = relationship(lazy="joined")
+
+
+class ProductionRow(Base):
+    """Одна строка плана и факта: изделие за период.
+
+    Строки из рапорта ссылаются на отчёт (report_id) и станка не знают — рапорт
+    цеховой. Строки, введённые руками, отчёта не имеют, зато у них можно указать
+    конкретный станок.
+    """
+
+    __tablename__ = "production_rows"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_id: Mapped[int | None] = mapped_column(
+        ForeignKey("production_reports.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True
+    )
+    machine_key: Mapped[str | None] = mapped_column(String(128), index=True)
+
+    period_from: Mapped[date] = mapped_column(Date, index=True)
+    period_to: Mapped[date] = mapped_column(Date, index=True)
+
+    plan_qty: Mapped[float | None] = mapped_column(Float)
+    fact_qty: Mapped[float | None] = mapped_column(Float)
+    return_qty: Mapped[float | None] = mapped_column(Float)
+
+    workshop: Mapped[str | None] = mapped_column(String(128), index=True)
+    note: Mapped[str | None] = mapped_column(Text)
+    row_no: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(String(16), default="file")  # file | manual
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now())
+
+    product: Mapped["Product"] = relationship(lazy="joined")
+
+
+Index("ix_production_rows_period", ProductionRow.period_from, ProductionRow.period_to)

@@ -29,9 +29,13 @@ CODES_OFF = ("0001", "0002")  # оборудование выключено / н
 
 @dataclass
 class Query:
-    """Что именно показываем: один файл или диапазон дат по всем файлам."""
+    """Что именно показываем: один файл, диапазон дат или всё загруженное.
 
-    scope: str = "file"  # file | range
+    Режимы range и all устроены одинаково — разница лишь в том, что у all нет границ
+    по датам, поэтому в выборку попадают все загруженные сутки.
+    """
+
+    scope: str = "file"  # file | range | all
     file_id: int | None = None
     date_from: datetime | None = None
     date_to: datetime | None = None
@@ -402,6 +406,12 @@ def machine_detail(db: Session, q: Query, machine_key: str) -> dict:
 
     return {
         "machine_key": machine_key,
+        # Границы периода, который реально попал в выборку. Нужны блоку «Продукция»:
+        # план и факт хранятся за свой период, и его надо с чем-то сопоставить.
+        "period": {
+            "from": days[0]["date"] if days else None,
+            "to": days[-1]["date"] if days else None,
+        },
         "totals": summary["totals"],
         "by_group": summary["by_group"],
         "by_param": summary["by_param"],

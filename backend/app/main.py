@@ -1,7 +1,7 @@
 """Сборка и запуск приложения.
 
 Этот файл — точка входа: он создаёт приложение FastAPI, подключает к нему разделы API
-(вход, пользователи, файлы, отчёты, оборудование) и выполняет действия при старте:
+(вход, пользователи, файлы, отчёты, оборудование, продукция) и выполняет действия при старте:
 
   1. дожидается, пока поднимется база (в docker-compose она стартует параллельно);
   2. создаёт недостающие таблицы и колонки;
@@ -24,7 +24,7 @@ from sqlalchemy.exc import OperationalError
 from .config import settings
 from .database import Base, SessionLocal, engine
 from .models import EquipmentCard, User
-from .routers import auth, data, equipment, files, users
+from .routers import auth, data, equipment, files, production, users
 from .security import hash_password
 
 logger = logging.getLogger("xml_parser")
@@ -62,7 +62,8 @@ if settings.cors_origins:
         allow_headers=["Authorization", "Content-Type"],
     )
 
-UPLOAD_PATH = "/api/files/upload"
+# Адреса, куда загружают файлы: им разрешено тело побольше, остальным хватает мегабайта
+UPLOAD_PATHS = ("/api/files/upload", "/api/equipment/import", "/api/production/reports/upload")
 SMALL_BODY_LIMIT = 1024 * 1024  # обычным JSON-запросам мегабайта хватает с запасом
 
 
@@ -78,7 +79,7 @@ async def limit_body_size(request: Request, call_next):
     if declared and declared.isdigit():
         allowed = (
             settings.max_upload_mb * 1024 * 1024 + 2 * 1024 * 1024
-            if request.url.path.startswith(UPLOAD_PATH)
+            if request.url.path.startswith(UPLOAD_PATHS)
             else SMALL_BODY_LIMIT
         )
         if int(declared) > allowed:
@@ -94,6 +95,7 @@ app.include_router(users.router)
 app.include_router(files.router)
 app.include_router(data.router)
 app.include_router(equipment.router)
+app.include_router(production.router)
 
 
 def wait_for_db(attempts: int = 30, delay: float = 2.0) -> None:

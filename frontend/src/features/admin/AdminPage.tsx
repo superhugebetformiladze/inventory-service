@@ -1,5 +1,5 @@
 /**
- * Админка: три раздела — файлы, оборудование и пользователи.
+ * Админка: файлы, оборудование, продукция и пользователи.
  *
  * Открытый раздел записан в адресе страницы (?tab=equipment), поэтому на него можно
  * дать ссылку коллеге, и он не сбрасывается при обновлении страницы.
@@ -8,13 +8,15 @@ import { useSearchParams } from 'react-router-dom'
 
 import { EquipmentPanel } from './EquipmentPanel'
 import { FilesPanel } from './FilesPanel'
+import { ProductionPanel } from './production/ProductionPanel'
 import { UsersPanel } from './UsersPanel'
 
-type Tab = 'files' | 'equipment' | 'users'
+type Tab = 'files' | 'equipment' | 'production' | 'users'
 
 const TABS: [Tab, string][] = [
   ['files', 'Файлы'],
   ['equipment', 'Оборудование'],
+  ['production', 'Продукция'],
   ['users', 'Пользователи'],
 ]
 
@@ -48,6 +50,7 @@ export function AdminPage() {
 
       {tab === 'files' && <FilesPanel />}
       {tab === 'equipment' && <EquipmentPanel />}
+      {tab === 'production' && <ProductionPanel />}
       {tab === 'users' && <UsersPanel />}
     </div>
   )
