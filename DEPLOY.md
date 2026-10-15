@@ -13,7 +13,7 @@ Windows Server — в конце.
 - Docker Engine 24+ и плагин Docker Compose v2 (`docker compose version`);
 - 2 ГБ ОЗУ и 2 ядра хватает с запасом; под данные — от 10 ГБ
   (одна выгрузка ≈ 5 МБ на диске плюс примерно столько же в БД);
-- свободные порты 80 и 443;
+- свободные порты 9080 и 9443 (меняются в `.env`, см. раздел 3);
 - сеть: доступ пользователей к серверу по HTTP(S); наружу в интернет сервису ходить не нужно.
 
 Установка Docker на Ubuntu/Debian, если его ещё нет:
@@ -64,8 +64,11 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<сгенерированный пароль админа>
 
 MAX_UPLOAD_MB=30
-HTTP_PORT=80
-HTTPS_PORT=443
+
+# Порты, на которых сервис виден снаружи.
+# Поменяйте, если эти заняты: значения подхватятся и nginx, и редиректом с http.
+HTTP_PORT=9080
+HTTPS_PORT=9443
 ```
 
 Файл `.env` содержит пароли — закройте к нему доступ: `chmod 600 .env`.
@@ -112,7 +115,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 - порт API наружу **не публикуется** — только через nginx;
 - Swagger выключен;
-- nginx слушает 80 (редирект на HTTPS) и 443;
+- nginx слушает `HTTP_PORT` (редирект на HTTPS) и `HTTPS_PORT`;
 - контейнеры поднимаются сами после перезагрузки сервера (`restart: always`);
 - логи контейнеров ограничены 3 файлами по 10 МБ.
 
@@ -120,16 +123,31 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
-curl -k https://localhost/api/health     # {"status":"ok"}
-curl -s http://localhost/healthz         # ok
+curl -k https://localhost:9443/api/health   # {"status":"ok"}
+curl -s http://localhost:9080/healthz       # ok
 ```
 
 В `docker compose ps` у `backend` и `db` в колонке портов не должно быть `0.0.0.0` —
 наружу они не смотрят.
 
+### Про нестандартные порты и адрес для пользователей
+
+Раздавайте коллегам **адрес с HTTPS-портом**: `https://<сервер>:9443/`.
+
+Порт 9080 оставлен только как подсказка для тех, кто наберёт адрес без `https`: nginx
+перебросит их на 9443. Но сработает это один раз. После первого успешного входа по HTTPS
+браузер запоминает для этого хоста правило HSTS и дальше сам подставляет `https` к любому
+адресу, **сохраняя порт**: `http://сервер:9080` превратится в `https://сервер:9080`, где
+TLS никто не обслуживает, и будет ошибка подключения. Это не поломка конфигурации, а то,
+как HSTS устроен: он привязан к имени хоста, а не к порту.
+
+Если такая полумера мешает, уберите публикацию HTTP-порта: в `docker-compose.prod.yml`
+удалите строку с `${HTTP_PORT:-9080}:80`. Тогда единственным рабочим адресом останется
+`https://<сервер>:9443/`, а попытка зайти по HTTP даст понятный отказ соединения.
+
 ## 6. Первый вход
 
-1. Откройте `https://<адрес-сервера>/` в браузере.
+1. Откройте `https://<адрес-сервера>:9443/` в браузере.
 2. Войдите под `ADMIN_USERNAME` / `ADMIN_PASSWORD` из `.env`.
 3. **Сразу смените пароль**: «Админка» → «Пользователи» → «пароль».
 4. Заведите учётки: роль «Просмотр» для тех, кто только смотрит отчёты,
@@ -141,13 +159,13 @@ curl -s http://localhost/healthz         # ok
 
 ## 7. Firewall
 
-Откройте только 80 и 443:
+Откройте только те порты, что указаны в `.env` (по умолчанию 9080 и 9443):
 
 ```bash
 # Ubuntu (ufw)
-sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw enable
+sudo ufw allow 9080/tcp && sudo ufw allow 9443/tcp && sudo ufw enable
 # RHEL/CentOS (firewalld)
-sudo firewall-cmd --permanent --add-service=http --add-service=https && sudo firewall-cmd --reload
+sudo firewall-cmd --permanent --add-port=9080/tcp --add-port=9443/tcp && sudo firewall-cmd --reload
 ```
 
 Внимание: Docker по умолчанию пишет правила в iptables в обход ufw. В нашей конфигурации
@@ -249,7 +267,7 @@ docker compose $P down                # остановить всё (данны�
 docker compose $P exec db psql -U xml -d xml_parser   # консоль БД
 ```
 
-Мониторинг: `https://<сервер>/healthz` отдаёт `ok`, `https://<сервер>/api/health` —
+Мониторинг: `https://<сервер>:9443/healthz` отдаёт `ok`, `https://<сервер>:9443/api/health` —
 `{"status":"ok"}`. Неудачные входы видны в логах backend по слову «Неудачный вход».
 
 Место на диске: `docker system df -v | grep xml_parser`.
@@ -258,7 +276,8 @@ docker compose $P exec db psql -U xml -d xml_parser   # консоль БД
 
 | Симптом | Что смотреть |
 |---|---|
-| Сайт не открывается | `docker compose $P ps` — все ли контейнеры `Up`; занят ли порт: `sudo ss -tlnp \| grep -E ':80\|:443'` |
+| `https://сервер:9080` не открывается после первого входа | Это HSTS: браузер подставил `https` к порту 9080. Заходите по `https://сервер:9443` |
+| Сайт не открывается | `docker compose $P ps` — все ли контейнеры `Up`; занят ли порт: `sudo ss -tlnp \| grep -E ':9080\|:9443'` |
 | `502 Bad Gateway` | backend не поднялся: `docker compose $P logs backend`; чаще всего недоступна БД |
 | Браузер ругается на сертификат | самоподписанный не добавлен в доверенные, либо в `subjectAltName` не тот адрес |
 | «Слишком много попыток входа» | сработала защита от подбора: 10 ошибок за 5 минут с одного адреса, подождать или `docker compose $P restart backend` |
@@ -275,8 +294,8 @@ docker compose $P exec db psql -U xml -d xml_parser   # консоль БД
 - команды выполняйте в PowerShell, пути пишите через `/` внутри compose-файлов;
 - проект держите **в файловой системе WSL** (`\\wsl$\Ubuntu\opt\xml_parser`), а не на диске
   `C:` — иначе тома и права работают заметно медленнее;
-- порты 80/443 на Windows часто заняты службой IIS или `http.sys`: проверьте
-  `netstat -ano | findstr ":80"`, при необходимости остановите `W3SVC`;
+- порты 80/443 на Windows часто заняты службой IIS или `http.sys`; мы по умолчанию
+  слушаем 9080/9443, но проверить занятость стоит: `netstat -ano | findstr ":9080"`;
 - автозапуск: в настройках Docker Desktop включите «Start Docker Desktop when you log in»
   и настройте автологин служебной учётки, либо разворачивайте через Docker CE в WSL
   с systemd-юнитом;
@@ -291,4 +310,4 @@ docker compose $P exec db psql -U xml -d xml_parser   # консоль БД
 - [ ] пароль администратора сменён после первого входа;
 - [ ] заведены рабочие учётные записи, лишних нет;
 - [ ] бэкап настроен и восстановление хотя бы раз проверено;
-- [ ] firewall пропускает только 80 и 443.
+- [ ] firewall пропускает только `HTTP_PORT` и `HTTPS_PORT` из `.env`.

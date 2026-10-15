@@ -18,7 +18,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query as Q, UploadFile, status
 from fastapi.responses import FileResponse, Response
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -34,6 +34,7 @@ from ..schemas import (
     ProductionRowOut,
     ProductionRowUpdate,
     ProductOut,
+    ProductSaved,
     ProductUpdate,
 )
 from ..services import production
@@ -114,18 +115,20 @@ def create_product(
     return product_out(product, [])
 
 
-@router.patch("/products/{product_id}", response_model=ProductOut)
+@router.patch("/products/{product_id}", response_model=ProductSaved)
 def update_product(
     product_id: int,
     payload: ProductUpdate,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
-) -> ProductOut:
+) -> ProductSaved:
     product = db.get(Product, product_id)
     if product is None:
         raise HTTPException(status_code=404, detail="Изделие не найдено")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    old_workshop = product.workshop
+    for field, value in changes.items():
         setattr(product, field, value)
 
     # Ключ собирается из названия, типа корпуса и цеха — после правки его надо пересобрать,
@@ -142,9 +145,42 @@ def update_product(
             )
         product.match_key = key
 
+    # Строки плана и факта хранят свою копию цеха — она пришла из рапорта или была
+    # введена руками. Если у изделия сменили цех, приводим к нему все его строки:
+    # иначе правка не видна ни в отчётах, ни в фильтрах, а название цеха так и остаётся
+    # записанным в нескольких вариантах («Цех №2» и «Цех №2 - Инструментально-штамповочный»).
+    rows_moved = 0
+    rows_from_other = 0
+    if "workshop" in changes and product.workshop != old_workshop:
+        # Сначала считаем, сколько строк стояли в каком-то третьем цехе: про них
+        # сообщаем отдельно, чтобы переезд не прошёл незаметно.
+        other = [
+            ProductionRow.product_id == product.id,
+            ProductionRow.workshop.is_not(None),
+            ProductionRow.workshop != product.workshop,
+        ]
+        if old_workshop is not None:
+            other.append(ProductionRow.workshop != old_workshop)
+        rows_from_other = db.scalar(select(func.count(ProductionRow.id)).where(*other)) or 0
+        rows_moved = db.execute(
+            update(ProductionRow)
+            .where(
+                ProductionRow.product_id == product.id,
+                or_(
+                    ProductionRow.workshop.is_(None),
+                    ProductionRow.workshop != product.workshop,
+                ),
+            )
+            .values(workshop=product.workshop)
+        ).rowcount
+
     db.commit()
     db.refresh(product)
-    return product_out(product, links_by_product(db).get(product.id, []))
+    return ProductSaved(
+        product=product_out(product, links_by_product(db).get(product.id, [])),
+        rows_moved=rows_moved,
+        rows_from_other=rows_from_other,
+    )
 
 
 @router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -372,7 +408,8 @@ def list_rows(
     date_from: date | None = None,
     date_to: date | None = None,
     report_id: int | None = None,
-    product_id: int | None = None,
+    # Можно повторить несколько раз: ?product_id=3&product_id=7
+    product_id: list[int] | None = Q(None),
     machine_key: str | None = None,
     workshop: str | None = None,
     search: str | None = None,
@@ -388,8 +425,8 @@ def list_rows(
         stmt = stmt.where(ProductionRow.period_from <= date_to)
     if report_id is not None:
         stmt = stmt.where(ProductionRow.report_id == report_id)
-    if product_id is not None:
-        stmt = stmt.where(ProductionRow.product_id == product_id)
+    if product_id:
+        stmt = stmt.where(ProductionRow.product_id.in_(product_id))
     if machine_key:
         stmt = stmt.where(ProductionRow.machine_key == machine_key)
     if source:
@@ -535,11 +572,12 @@ def export_xlsx(
     date_to: date | None = None,
     workshop: str | None = None,
     search: str | None = None,
+    product_id: list[int] | None = Q(None),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> Response:
     """Выгрузка плана и факта в Excel — ровно та выборка, что видна на странице."""
-    rows = production.rows_in_period(db, date_from, date_to)
+    rows = production.rows_in_period(db, date_from, date_to, product_ids=product_id or None)
     if workshop:
         rows = [row for row in rows if (row.workshop or row.product.workshop) == workshop]
     if search:

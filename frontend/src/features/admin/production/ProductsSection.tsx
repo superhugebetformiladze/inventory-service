@@ -1,7 +1,10 @@
 /**
  * Справочник изделий и закрепление их за станками.
  *
- * Номенклатура пополняется сама при загрузке рапорта, здесь её можно поправить
+ * Номенклатура пополняется сама при загрузке рапорта, здесь её можно поправить.
+ * Цех меняется прямо в таблице: вместе с изделием переезжают и его строки плана
+ * и факта, иначе правка не была бы видна ни в отчётах, ни в фильтрах.
+ * Остальные поля правятся
  * и, главное, указать, на каких станках изделие делают: в рапорте станков нет,
  * он составляется по цехам. Одно изделие может выпускаться на нескольких станках,
  * и на одном станке может делаться несколько изделий.
@@ -25,11 +28,15 @@ export function ProductsSection() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [search, setSearch] = useState('')
   const [workshop, setWorkshop] = useState('')
   const [editing, setEditing] = useState<Product | 'new' | null>(null)
   /** Для какого изделия сейчас открыт выбор станка. */
   const [linking, setLinking] = useState<number | null>(null)
+  /** Для какого изделия правим цех прямо в таблице. */
+  const [shopEdit, setShopEdit] = useState<number | null>(null)
+  const [shopDraft, setShopDraft] = useState('')
 
   const load = useCallback(async () => {
     const [items, bound, bindings] = await Promise.all([
@@ -98,6 +105,28 @@ export function ProductsSection() {
     }
   }
 
+  async function saveShop(product: Product): Promise<void> {
+    const value = shopDraft.trim()
+    setShopEdit(null)
+    if (value === (product.workshop ?? '')) return
+    try {
+      const saved = await productionApi.updateProduct(product.id, { workshop: value || null })
+      setInfo(
+        [
+          `Изделие «${product.name}» переведено в цех «${value || '—'}».`,
+          saved.rows_moved && `Строк плана и факта переехало: ${saved.rows_moved}.`,
+          saved.rows_from_other &&
+            `Из них были записаны в другой цех: ${saved.rows_from_other}.`,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      )
+      await load()
+    } catch (err) {
+      setError(message(err))
+    }
+  }
+
   async function removeProduct(product: Product): Promise<void> {
     if (
       !window.confirm(
@@ -116,6 +145,9 @@ export function ProductsSection() {
   return (
     <>
       <Alert onClose={() => setError('')}>{error}</Alert>
+      <Alert kind="success" onClose={() => setInfo('')}>
+        {info}
+      </Alert>
 
       <Card
         title="Номенклатура"
@@ -152,6 +184,13 @@ export function ProductsSection() {
           </span>
         </div>
 
+        {/* Подсказка при правке цеха: уже заведённые цеха, чтобы не плодить опечатки */}
+        <datalist id="known-workshops">
+          {workshops.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
+
         {loading ? (
           <Loader />
         ) : visible.length === 0 ? (
@@ -182,7 +221,34 @@ export function ProductsSection() {
                         {product.name}
                       </td>
                       <td className="muted ellipsis">{product.body_type || '—'}</td>
-                      <td className="muted ellipsis">{product.workshop || '—'}</td>
+                      <td className="muted ellipsis">
+                        {shopEdit === product.id ? (
+                          <input
+                            autoFocus
+                            list="known-workshops"
+                            className="cell-input wide"
+                            value={shopDraft}
+                            onChange={(event) => setShopDraft(event.target.value)}
+                            onBlur={() => void saveShop(product)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') event.currentTarget.blur()
+                              if (event.key === 'Escape') setShopEdit(null)
+                            }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="cell-edit"
+                            title="Изменить цех"
+                            onClick={() => {
+                              setShopDraft(product.workshop ?? '')
+                              setShopEdit(product.id)
+                            }}
+                          >
+                            {product.workshop || '— задать цех —'}
+                          </button>
+                        )}
+                      </td>
                       <td className="muted">{product.unit}</td>
                       <td>
                         <div className="chip-row">
@@ -263,8 +329,9 @@ export function ProductsSection() {
         <ProductDialog
           product={editing === 'new' ? null : editing}
           onCancel={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={(text) => {
             setEditing(null)
+            if (text) setInfo(text)
             void load()
           }}
           onError={setError}

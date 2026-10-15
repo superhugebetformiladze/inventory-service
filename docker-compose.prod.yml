@@ -3,7 +3,7 @@
 # Отличия от базового файла:
 #   - порт API наружу не публикуется (доступ только через nginx внутри сети compose);
 #   - Swagger выключен;
-#   - nginx слушает 80 и 443, конфиг и сертификаты подключаются с хоста;
+#   - nginx слушает порты из HTTP_PORT и HTTPS_PORT, конфиг и сертификаты с хоста;
 #   - контейнеры поднимаются автоматически после перезагрузки сервера;
 #   - в БД и приложении включено ограничение на объём логов.
 
@@ -31,11 +31,17 @@ services:
   frontend:
     restart: always
     ports: !override
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
+      - "${HTTP_PORT:-9080}:80"
+      - "${HTTPS_PORT:-9443}:443"
+    environment:
+      # Порт, на котором HTTPS виден снаружи: нужен nginx для редиректа с http://
+      XMLP_HTTPS_PORT: ${HTTPS_PORT:-9443}
+      # Подставлять только наши переменные, не трогая $host и прочие переменные nginx
+      NGINX_ENVSUBST_FILTER: "^XMLP_"
     volumes:
-      # Конфиг с HTTPS и редиректом с http://
-      - ./deploy/nginx-tls.conf:/etc/nginx/conf.d/default.conf:ro
+      # Конфиг с HTTPS и редиректом с http://. Подключается шаблоном: при старте
+      # контейнера nginx подставит в него XMLP_HTTPS_PORT и положит в conf.d/default.conf.
+      - ./deploy/nginx-tls.conf:/etc/nginx/templates/default.conf.template:ro
       # Сертификат и ключ: deploy/certs/server.crt и deploy/certs/server.key
       - ./deploy/certs:/etc/nginx/certs:ro
     logging:

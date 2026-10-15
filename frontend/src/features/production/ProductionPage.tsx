@@ -2,7 +2,7 @@
  * Страница «Продукция»: план, факт и выполнение по всей номенклатуре.
  *
  * Что здесь есть:
- *   * фильтры — период (или «за всё время»), цех, поиск по названию изделия;
+ *   * фильтры — период (или «за всё время»), цех, поиск и выбор конкретных изделий;
  *   * показатели: план, сдано, выполнение плана, возврат;
  *   * две круговые диаграммы — как распределён выпуск между цехами и между изделиями;
  *   * таблица с правкой прямо в строке и кнопкой «Добавить строку»;
@@ -19,9 +19,10 @@ import { ProductionPie } from '@/components/charts'
 import { Alert, Card, Empty, Kpi, Loader } from '@/components/ui'
 import { useAuth } from '@/auth/AuthContext'
 import { formatNumber } from '@/lib/format'
-import type { MachineBinding, ProductionRow } from '@/types/api'
+import type { MachineBinding, Product, ProductionRow } from '@/types/api'
 
 import { RowDialog } from '../admin/production/RowDialog'
+import { ProductPicker } from './ProductPicker'
 import { ProductionTable } from './ProductionTable'
 
 /** Сколько строк тянем за раз. Месяц рапортов — это сотни строк, запас большой. */
@@ -52,10 +53,16 @@ export function ProductionPage() {
   const dateTo = search.get('date_to') || defaultTo
   const workshop = search.get('workshop') || ''
   const query = search.get('q') || ''
+  // Выбранные изделия — списком идентификаторов через запятую: ?products=3,7
+  const selectedProducts = (search.get('products') || '')
+    .split(',')
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0)
 
   const [rows, setRows] = useState<ProductionRow[]>([])
   const [machines, setMachines] = useState<MachineBinding[]>([])
   const [workshops, setWorkshops] = useState<string[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [adding, setAdding] = useState(false)
@@ -79,8 +86,12 @@ export function ProductionPage() {
       date_to: allTime ? undefined : dateTo,
       workshop: workshop || undefined,
       search: query || undefined,
+      product_id: selectedProducts.length ? selectedProducts : undefined,
     }),
-    [allTime, dateFrom, dateTo, workshop, query],
+    // selectedProducts — новый массив на каждый рендер, поэтому в зависимости
+    // кладём его строковое представление из адреса
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allTime, dateFrom, dateTo, workshop, query, search.get('products')],
   )
 
   const load = useCallback(async () => {
@@ -128,10 +139,15 @@ export function ProductionPage() {
   }, [load, periodReady])
 
   useEffect(() => {
-    Promise.all([equipmentApi.machines(), productionApi.workshops()])
-      .then(([bindings, shops]) => {
+    Promise.all([
+      equipmentApi.machines(),
+      productionApi.workshops(),
+      productionApi.products(),
+    ])
+      .then(([bindings, shops, items]) => {
         setMachines(bindings)
         setWorkshops(shops)
+        setProducts(items)
       })
       .catch((err) => setError(message(err)))
   }, [])
@@ -171,6 +187,19 @@ export function ProductionPage() {
     })
     return [...acc.values()]
   }, [rows])
+
+  // В списке выбора показываем изделия выбранного цеха: так в нём остаётся
+  // обозримое число позиций. Уже отмеченные не прячем, даже если цех сменился.
+  const pickable = useMemo(
+    () =>
+      workshop
+        ? products.filter(
+            (product) => product.workshop === workshop || selectedProducts.includes(product.id),
+          )
+        : products,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [products, workshop, search.get('products')],
+  )
 
   async function exportExcel(): Promise<void> {
     setExporting(true)
@@ -283,9 +312,18 @@ export function ProductionPage() {
           </label>
         </div>
 
+        {/* Выбор конкретных изделий: пустой список означает «показывать все» */}
+        <ProductPicker
+          products={pickable}
+          selected={selectedProducts}
+          onChange={(value) => patch('products', value.join(','))}
+        />
+
         <p className="hint">
           Показаны строки, период которых пересекается с выбранным. Строки из рапортов
           заведены по цехам, строки с указанным станком — введены вручную.
+          {selectedProducts.length > 0 &&
+            ' Показатели, диаграммы и выгрузка считаются только по выбранным изделиям.'}
         </p>
       </section>
 

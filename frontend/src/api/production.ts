@@ -26,7 +26,8 @@ export interface RowsQuery {
   date_from?: string
   date_to?: string
   report_id?: number
-  product_id?: number
+  /** Несколько изделий: уходит повторяющимся параметром product_id. */
+  product_id?: number[]
   machine_key?: string
   workshop?: string
   /** Поиск по названию изделия и типу корпуса. */
@@ -60,8 +61,16 @@ export const workshops = (): Promise<string[]> => request<string[]>('/production
 export const createProduct = (body: ProductPatch): Promise<Product> =>
   request<Product>('/production/products', { method: 'POST', body })
 
-export const updateProduct = (id: number, body: ProductPatch): Promise<Product> =>
-  request<Product>(`/production/products/${id}`, { method: 'PATCH', body })
+/** Ответ на правку: изделие и сколько строк плана и факта переехало при смене цеха. */
+export interface ProductSaved {
+  product: Product
+  rows_moved: number
+  /** Сколько из переехавших строк стояли в каком-то третьем цехе. */
+  rows_from_other: number
+}
+
+export const updateProduct = (id: number, body: ProductPatch): Promise<ProductSaved> =>
+  request<ProductSaved>(`/production/products/${id}`, { method: 'PATCH', body })
 
 export const removeProduct = (id: number): Promise<void> =>
   request<void>(`/production/products/${id}`, { method: 'DELETE' })
@@ -129,6 +138,7 @@ export async function exportXlsx(params?: {
   date_to?: string
   workshop?: string
   search?: string
+  product_id?: number[]
 }): Promise<void> {
   const response = await request<Response>(`/production/export.xlsx${qs(params)}`, { raw: true })
   const { saveBlob } = await import('./client')

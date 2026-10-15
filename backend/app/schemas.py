@@ -204,6 +204,16 @@ class ProductUpdate(BaseModel):
     notes: str | None = None
 
 
+class ProductSaved(BaseModel):
+    """Ответ на правку изделия: само изделие и сколько строк плана и факта
+    переехало вместе с ним при смене цеха."""
+
+    product: ProductOut
+    rows_moved: int = 0
+    # Из них стояли в каком-то третьем цехе — о таких сообщаем отдельно
+    rows_from_other: int = 0
+
+
 class MachineLinkIn(BaseModel):
     """Запрос «закрепить изделие за станком»."""
 

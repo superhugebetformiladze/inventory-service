@@ -14,7 +14,8 @@ interface ProductDialogProps {
   /** Изделие для правки или null, если создаём новое. */
   product: Product | null
   onCancel: () => void
-  onSaved: () => void
+  /** Вызывается после сохранения; info — что стоит показать пользователю. */
+  onSaved: (info?: string) => void
   onError: (message: string) => void
 }
 
@@ -39,9 +40,24 @@ export function ProductDialog({ product, onCancel, onSaved, onError }: ProductDi
       notes: notes || null,
     }
     try {
-      if (product) await productionApi.updateProduct(product.id, payload)
-      else await productionApi.createProduct(payload)
-      onSaved()
+      if (product) {
+        const saved = await productionApi.updateProduct(product.id, payload)
+        onSaved(
+          saved.rows_moved
+            ? [
+                `Изделие сохранено. В цех «${saved.product.workshop ?? '—'}» переехало`,
+                `строк плана и факта: ${saved.rows_moved}.`,
+                saved.rows_from_other &&
+                  `Из них были записаны в другой цех: ${saved.rows_from_other}.`,
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : undefined,
+        )
+      } else {
+        await productionApi.createProduct(payload)
+        onSaved()
+      }
     } catch (err) {
       onError(err instanceof Error ? err.message : String(err))
     } finally {
