@@ -65,6 +65,11 @@ switch ($Target) {
         Write-Host '  link      связать отложенный отчёт с машиной'
         Write-Host '  import    принять отчёты с машин без сети: -dir <каталог>'
         Write-Host '  agent     собрать комплект раскатки под Windows в build/'
+        Write-Host ''
+        Write-Host '  netscan-import  принять снимки коммутаторов из файлов: -dir <каталог>'
+        Write-Host '  netscan-poll    опросить коммутатор сейчас: -target <адрес> [-dry]'
+        Write-Host '  netscan-list    опрошенные сетевые устройства'
+        Write-Host '  netscan-exe     собрать netscan.exe для машины с доступом к коммутаторам'
         Write-Host '  package   собрать пакет раскатки в build/пакет/ (кладётся в общую папку)'
         Write-Host ''
         Write-Host '  prod-build / prod-migrate / prod-up / prod-down / prod-ps / prod-logs'
@@ -96,7 +101,8 @@ switch ($Target) {
         foreach ($t in @(
             @('inventory.snapshots.v1', 'retention.ms=2592000000'),
             @('inventory.hosts.v1',     'cleanup.policy=compact'),
-            @('inventory.events.v1',    'retention.ms=7776000000'))) {
+            @('inventory.events.v1',    'retention.ms=7776000000'),
+            @('inventory.network.v1',   'cleanup.policy=compact'))) {
             & docker @($compose + @('exec', 'redpanda', 'rpk', 'topic', 'create', $t[0], '-p', '3', '-c', $t[1]))
         }
         Invoke-Docker ($compose + @('exec', 'redpanda', 'rpk', 'topic', 'list'))
@@ -119,6 +125,24 @@ switch ($Target) {
         $full = (Resolve-Path $dir).Path
         Invoke-Docker ($compose + @('run', '--rm', '-v', "${full}:/mnt/offline:ro", 'server',
             'go', 'run', './cmd/agentctl', 'import', '-dir', '/mnt/offline'))
+    }
+    'netscan-import' {
+        $dir = ($Rest | Select-Object -Last 1)
+        if (-not $dir -or -not (Test-Path $dir)) {
+            Write-Host 'Укажите каталог: .\make.ps1 netscan-import -dir X:\обходы' -ForegroundColor Red
+            exit 1
+        }
+        $full = (Resolve-Path $dir).Path
+        Invoke-Docker ($compose + @('run', '--rm', '-v', "${full}:/mnt/netscan:ro", 'server',
+            'go', 'run', './cmd/agentctl', 'netscan-import', '-dir', '/mnt/netscan'))
+    }
+    'netscan-poll' { Invoke-Docker ($compose + @('run', '--rm', 'server', 'go', 'run', './cmd/agentctl', 'netscan-poll') + $Rest) }
+    'netscan-list' { Invoke-Docker ($compose + @('run', '--rm', 'server', 'go', 'run', './cmd/agentctl', 'netscan-list')) }
+    'netscan-exe' {
+        Invoke-Docker ($run + @('sh', '-c',
+            'GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=''-s -w'' -o build/netscan.exe ./cmd/netscan'))
+        Copy-Item 'scripts/switches.example.txt' 'build/' -Force
+        Get-Item 'build/netscan.exe' | Select-Object Name, Length, LastWriteTime
     }
     'agent' {
         # Кросс-сборка под Windows идёт в контейнере: версия Go и флаги должны

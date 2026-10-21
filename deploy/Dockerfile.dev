@@ -5,7 +5,8 @@ FROM golang:1.27-alpine
 
 # gcc и musl-dev нужны детектору гонок: `go test -race` требует cgo. Гонки в
 # службе, которая пишет из нескольких горутин, ловятся только так.
-RUN apk add --no-cache git make curl gcc musl-dev
+# net-snmp-tools — snmpbulkwalk для опроса коммутаторов (NETSCAN_WALKER=snmpwalk).
+RUN apk add --no-cache git make curl gcc musl-dev net-snmp-tools
 
 # Линтер ставится в образ, а не запускается отдельным контейнером: так его
 # версия зафиксирована вместе с версией Go.

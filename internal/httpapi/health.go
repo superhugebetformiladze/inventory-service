@@ -80,6 +80,11 @@ type Deps struct {
 	// одного адреса.
 	EnrollBurst int
 
+	// NetTargets — список опроса сетевых устройств; Scanner — сам опрос,
+	// nil, когда он выключен (нет строки доступа SNMP).
+	NetTargets NetworkTargets
+	Scanner    Scanner
+
 	Logger *slog.Logger
 
 	// Now подменяется в тестах: ограничитель частоты живёт по часам.
@@ -156,6 +161,18 @@ func Router(deps Deps) *http.ServeMux {
 		mux.HandleFunc("GET /v1/admin/health",
 			requireAdmin(deps.AdminToken, deps.Logger,
 				adminHealth(deps.Doctor, deps.Logger, deps.Now)))
+	}
+
+	if deps.NetTargets != nil && deps.AdminToken != "" {
+		mux.HandleFunc("GET /v1/admin/network/targets",
+			requireAdmin(deps.AdminToken, deps.Logger,
+				adminListTargets(deps.NetTargets, deps.Scanner, deps.Logger)))
+		mux.HandleFunc("PUT /v1/admin/network/targets",
+			requireAdmin(deps.AdminToken, deps.Logger,
+				adminReplaceTargets(deps.NetTargets, deps.Scanner, deps.Logger)))
+		mux.HandleFunc("POST /v1/admin/network/poll",
+			requireAdmin(deps.AdminToken, deps.Logger,
+				adminPollNow(deps.Scanner, deps.Logger)))
 	}
 
 	return mux

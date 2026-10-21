@@ -30,7 +30,8 @@ RUN for cmd in server migrate agentctl; do \
 
 FROM alpine:3.20 AS runtime
 
-RUN apk add --no-cache ca-certificates tzdata \
+# net-snmp-tools — snmpbulkwalk для опроса коммутаторов (NETSCAN_WALKER=snmpwalk).
+RUN apk add --no-cache ca-certificates tzdata net-snmp-tools \
     && adduser -D -u 10001 app
 
 COPY --from=build /out/ /usr/local/bin/

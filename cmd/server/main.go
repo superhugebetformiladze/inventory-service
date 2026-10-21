@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/broton07/inventory_service/internal/httpapi"
 	"github.com/broton07/inventory_service/internal/ingest"
 	"github.com/broton07/inventory_service/internal/metrics"
+	"github.com/broton07/inventory_service/internal/netscan"
 	"github.com/broton07/inventory_service/internal/outbox"
 	"github.com/broton07/inventory_service/internal/publish"
 	"github.com/broton07/inventory_service/internal/retention"
@@ -70,6 +72,49 @@ func run() error {
 		Logger:    slog.Default(),
 	})
 
+	// Опрос сетевых устройств — только если задана строка доступа SNMP. Без
+	// неё служба работает как раньше: снимки устройств приходят файлами.
+	// Адреса — из настроек и из списка, который присылает внешняя система.
+	var (
+		scanner     *netscan.Runner
+		scannerDeps httpapi.Scanner
+	)
+	if cfg.SNMPCommunity != "" {
+		dial, cleanup, err := netscan.NewDialer(cfg.NetscanWalker, netscan.SNMPOptions{
+			Community: cfg.SNMPCommunity,
+			Timeout:   cfg.SNMPTimeout,
+			Retries:   cfg.SNMPRetries,
+		})
+		if err != nil {
+			return fmt.Errorf("опрос сетевых устройств: %w", err)
+		}
+		defer cleanup()
+
+		// Адреса из настроек — в тот же список, что и присланные: так у них
+		// тоже виден итог последней попытки.
+		var fromConfig []storage.NetworkTarget
+		for _, ip := range cfg.NetscanTargets {
+			fromConfig = append(fromConfig, storage.NetworkTarget{IP: ip})
+		}
+		if _, err := pool.ReplaceNetworkTargets(ctx, "config", fromConfig); err != nil {
+			slog.Warn("адреса из настроек не записаны в список опроса", "err", err)
+		}
+
+		scanner = netscan.NewRunner(netscan.NewService(pool, time.Now), dial,
+			netscan.RunnerOptions{
+				Targets:  cfg.NetscanTargets,
+				List:     pool,
+				Interval: cfg.NetscanInterval,
+				Timeout:  cfg.NetscanTimeout,
+				Silence:  cfg.NetscanSilence,
+				Logger:   slog.Default(),
+			})
+		// Не присваивать nil-указатель интерфейсу: «опрос выключен» маршруты
+		// узнают по nil интерфейса.
+		scannerDeps = scanner
+		slog.Info("опрос сетевых устройств включён", "walker", cfg.NetscanWalker)
+	}
+
 	srv := &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.Router(httpapi.Deps{
@@ -87,6 +132,10 @@ func run() error {
 			// учётной системе: показатели в /metrics читает Prometheus, а
 			// человеку нужен ответ на вопрос «почему данные устарели».
 			Doctor: pool,
+
+			// Список опроса коммутаторов: учёт присылает свои.
+			NetTargets: pool,
+			Scanner:    scannerDeps,
 
 			// Предел частоты регистраций рассчитан на раскатку: см.
 			// httpapi.DefaultEnrollBurst.
@@ -120,6 +169,13 @@ func run() error {
 	})
 
 	var wg sync.WaitGroup
+	if scanner != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			scanner.Run(ctx)
+		}()
+	}
 	wg.Add(4)
 	go func() {
 		defer wg.Done()

@@ -77,6 +77,7 @@ topics: ## Создать топики ленты с нужными настро
 	$(COMPOSE) exec redpanda rpk topic create inventory.snapshots.v1 -p 3 -c retention.ms=2592000000 || true
 	$(COMPOSE) exec redpanda rpk topic create inventory.hosts.v1     -p 3 -c cleanup.policy=compact || true
 	$(COMPOSE) exec redpanda rpk topic create inventory.events.v1    -p 3 -c retention.ms=7776000000 || true
+	$(COMPOSE) exec redpanda rpk topic create inventory.network.v1   -p 3 -c cleanup.policy=compact || true
 	$(COMPOSE) exec redpanda rpk topic list
 
 .PHONY: token
@@ -114,6 +115,25 @@ link-new: ## Завести новую машину по отложенному 
 .PHONY: import
 import: ## Принять отчёты с машин без сети: make import DIR=/mnt/флешка
 	$(COMPOSE) run --rm -v "$(DIR):/mnt/offline:ro" server go run ./cmd/agentctl import -dir /mnt/offline
+
+.PHONY: netscan-import
+netscan-import: ## Принять снимки коммутаторов из файлов (.walk/.json): make netscan-import DIR=/путь
+	$(COMPOSE) run --rm -v "$(DIR):/mnt/netscan:ro" server go run ./cmd/agentctl netscan-import -dir /mnt/netscan
+
+.PHONY: netscan-poll
+netscan-poll: ## Опросить коммутатор сейчас: make netscan-poll TARGET=192.168.4.172 [DRY=1]
+	$(COMPOSE) run --rm server go run ./cmd/agentctl netscan-poll -target "$(TARGET)" $(if $(filter 1,$(DRY)),-dry,)
+
+.PHONY: netscan-list
+netscan-list: ## Опрошенные сетевые устройства
+	$(COMPOSE) run --rm server go run ./cmd/agentctl netscan-list
+
+.PHONY: netscan-exe
+netscan-exe: ## Собрать netscan.exe — опрос коммутаторов с машины, у которой есть к ним доступ
+	@mkdir -p build
+	$(RUN) sh -c 'GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o build/netscan.exe ./cmd/netscan'
+	@cp scripts/switches.example.txt build/
+	@ls -lh build/netscan.exe
 
 .PHONY: agent
 agent: ## Собрать комплект раскатки под Windows в build/

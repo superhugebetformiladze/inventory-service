@@ -70,6 +70,12 @@ func main() {
 		err = вывестиИзУчёта(ctx, pool, os.Args[2:])
 	case "dismiss":
 		err = закрытьОтчёт(ctx, pool, os.Args[2:])
+	case "netscan-import":
+		err = принятьОбходы(ctx, pool, os.Args[2:])
+	case "netscan-poll":
+		err = опроситьУстройство(ctx, pool, os.Args[2:])
+	case "netscan-list":
+		err = списокУстройств(ctx, pool, os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -94,7 +100,11 @@ func usage() {
   import   принять отчёты с машин без сети: agentctl import -dir /mnt/флешка
   cleanup  разово удалить устаревшее (служба делает это сама раз в сутки)
   retire   вывести машину из учёта: agentctl retire -host <id> | -name <имя>
-  dismiss  закрыть отложенный отчёт, не заводя машину: -report <id> | -all`)
+  dismiss  закрыть отложенный отчёт, не заводя машину: -report <id> | -all
+
+  netscan-import  принять снимки коммутаторов из файлов: -dir <каталог>
+  netscan-poll    опросить коммутатор сейчас: -target <адрес> [-dry]
+  netscan-list    опрошенные сетевые устройства`)
 }
 
 func открытьБазу(ctx context.Context) (*storage.Pool, error) {

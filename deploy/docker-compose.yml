@@ -87,6 +87,17 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       SILENCE_THRESHOLD: ${SILENCE_THRESHOLD:-168h}
       SILENCE_INTERVAL: ${SILENCE_INTERVAL:-1h}
+      # Опрос коммутаторов (этап 12). Без явной передачи переменные .env
+      # внутрь контейнера не попадают — и опрос молча не включался бы.
+      NETSCAN_TARGETS: ${NETSCAN_TARGETS:-}
+      NETSCAN_TARGETS_FILE: ${NETSCAN_TARGETS_FILE:-}
+      SNMP_COMMUNITY: ${SNMP_COMMUNITY:-}
+      NETSCAN_INTERVAL: ${NETSCAN_INTERVAL:-30m}
+      NETSCAN_TIMEOUT: ${NETSCAN_TIMEOUT:-2m}
+      NETSCAN_SILENCE: ${NETSCAN_SILENCE:-}
+      SNMP_TIMEOUT: ${SNMP_TIMEOUT:-5s}
+      SNMP_RETRIES: ${SNMP_RETRIES:-1}
+      NETSCAN_WALKER: ${NETSCAN_WALKER:-snmpwalk}
     ports:
       - "${BIND_ADDR:-0.0.0.0}:${HTTP_EXPOSED_PORT:-8090}:8080"
     volumes:

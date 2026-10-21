@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -90,5 +91,49 @@ func TestНесколькоБрокеровЧерезЗапятую(t *testing.T
 	}
 	if cfg.KafkaBrokers[1] != "b:9092" {
 		t.Errorf("пробелы вокруг адреса не обрезаны: %q", cfg.KafkaBrokers[1])
+	}
+}
+
+func TestОпросКоммутаторовТребуетСтрокуДоступа(t *testing.T) {
+	// I10: список задан, строки доступа нет — служба не стартует. Опрос с
+	// пустой строкой отвечал бы «не отвечают все» и выглядел бы как авария сети.
+	setEnv(t, полноеОкружение())
+	t.Setenv("NETSCAN_TARGETS", "192.168.8.10")
+	t.Setenv("SNMP_COMMUNITY", "")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "SNMP_COMMUNITY") {
+		t.Fatalf("ожидалась ошибка про SNMP_COMMUNITY, получено %v", err)
+	}
+}
+
+func TestСписокКоммутаторовИзФайла(t *testing.T) {
+	path := t.TempDir() + "/switches.txt"
+	body := "# ядро первым\n192.168.8.10   # DGS-3130\n\n192.168.4.172\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	setEnv(t, полноеОкружение())
+	t.Setenv("NETSCAN_TARGETS", "10.0.0.1")
+	t.Setenv("NETSCAN_TARGETS_FILE", path)
+	t.Setenv("SNMP_COMMUNITY", "секрет")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"10.0.0.1", "192.168.8.10", "192.168.4.172"}
+	if strings.Join(cfg.NetscanTargets, ",") != strings.Join(want, ",") {
+		t.Errorf("адреса: %v, ожидались %v", cfg.NetscanTargets, want)
+	}
+}
+
+func TestНечитаемыйФайлКоммутаторов(t *testing.T) {
+	setEnv(t, полноеОкружение())
+	t.Setenv("NETSCAN_TARGETS_FILE", "/нет/такого/файла")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("указанный, но нечитаемый файл должен останавливать старт")
 	}
 }

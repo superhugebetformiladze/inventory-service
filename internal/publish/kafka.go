@@ -16,6 +16,10 @@ const (
 	TopicSnapshots = "inventory.snapshots.v1"
 	TopicHosts     = "inventory.hosts.v1"
 	TopicEvents    = "inventory.events.v1"
+
+	// TopicNetwork — состояние управляемых сетевых устройств, уплотняемый.
+	// Ключ — идентификатор устройства, как у машин — идентификатор машины.
+	TopicNetwork = "inventory.network.v1"
 )
 
 // Message — одно сообщение ленты.

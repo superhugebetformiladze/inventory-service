@@ -75,6 +75,25 @@ type Config struct {
 	// задание любой машине парка, не должен получаться случайно — из-за
 	// незаданной переменной или опечатки в имени.
 	AdminToken string
+
+	// Опрос сетевых устройств по SNMP.
+	//
+	// Список адресов пуст — опроса нет, и это обычное состояние: у службы
+	// может не быть сетевого доступа к коммутаторам, и тогда снимки приходят
+	// файлами (`agentctl netscan-import`). Задан список — обязательна строка
+	// доступа (I10): опрос с пустой строкой молча отвечал бы «не отвечают все».
+	NetscanTargets  []string
+	SNMPCommunity   string
+	NetscanInterval time.Duration
+	NetscanTimeout  time.Duration
+	// NetscanSilence — после скольких неудачных опросов подряд (по времени)
+	// устройство считается молчащим; 0 — четыре периода опроса.
+	NetscanSilence time.Duration
+	SNMPTimeout    time.Duration
+	SNMPRetries    int
+	// NetscanWalker — чем опрашивать: snmpwalk (программа net-snmp, по
+	// умолчанию) или gosnmp (встроенная библиотека).
+	NetscanWalker string
 }
 
 // missing собирает имена незаданных обязательных переменных, чтобы сказать о
@@ -190,11 +209,79 @@ func Load() (Config, error) {
 	// не задан — административных маршрутов нет.
 	cfg.AdminToken = os.Getenv("ADMIN_TOKEN")
 
+	for _, t := range strings.Split(os.Getenv("NETSCAN_TARGETS"), ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			cfg.NetscanTargets = append(cfg.NetscanTargets, t)
+		}
+	}
+	// Список из файла — когда коммутаторов сотня: строка в .env на полторы
+	// тысячи символов нечитаема и правится с ошибками. Файл указан, но не
+	// читается — служба не стартует: молча опрашивать пустой список значило
+	// бы неделю не замечать, что опрос стоит.
+	if path := strings.TrimSpace(os.Getenv("NETSCAN_TARGETS_FILE")); path != "" {
+		fromFile, err := readTargets(path)
+		if err != nil {
+			return Config{}, fmt.Errorf("NETSCAN_TARGETS_FILE: %w", err)
+		}
+		cfg.NetscanTargets = append(cfg.NetscanTargets, fromFile...)
+	}
+	if len(cfg.NetscanTargets) > 0 {
+		cfg.SNMPCommunity = m.required("SNMP_COMMUNITY")
+	} else {
+		// Без списка в настройках строка доступа всё равно нужна: адреса
+		// может прислать внешняя система (PUT /v1/admin/network/targets).
+		// Задана — опрос включён, не задана — выключен.
+		cfg.SNMPCommunity = os.Getenv("SNMP_COMMUNITY")
+	}
+	cfg.NetscanWalker = optional("NETSCAN_WALKER", "snmpwalk")
+	if cfg.NetscanWalker != "snmpwalk" && cfg.NetscanWalker != "gosnmp" {
+		return Config{}, fmt.Errorf("NETSCAN_WALKER: ожидалось snmpwalk или gosnmp, получено %q", cfg.NetscanWalker)
+	}
+	for _, поле := range []struct {
+		имя       string
+		умолчание string
+		цель      *time.Duration
+	}{
+		{"NETSCAN_INTERVAL", "30m", &cfg.NetscanInterval},
+		{"NETSCAN_TIMEOUT", "2m", &cfg.NetscanTimeout},
+		{"SNMP_TIMEOUT", "5s", &cfg.SNMPTimeout},
+		{"NETSCAN_SILENCE", "0s", &cfg.NetscanSilence},
+	} {
+		d, err := time.ParseDuration(optional(поле.имя, поле.умолчание))
+		if err != nil {
+			return Config{}, fmt.Errorf("%s: %w", поле.имя, err)
+		}
+		*поле.цель = d
+	}
+	retries, err := strconv.Atoi(optional("SNMP_RETRIES", "1"))
+	if err != nil {
+		return Config{}, fmt.Errorf("SNMP_RETRIES: ожидалось число, получено %q", os.Getenv("SNMP_RETRIES"))
+	}
+	cfg.SNMPRetries = retries
+
 	if len(m) > 0 {
 		return Config{}, fmt.Errorf("не заданы обязательные переменные окружения: %s", strings.Join(m, ", "))
 	}
 
 	return cfg, nil
+}
+
+// readTargets читает адреса по одному в строке; «#» — комментарий до конца строки.
+func readTargets(path string) ([]string, error) {
+	body, err := os.ReadFile(path) //nolint:gosec // путь задаёт администратор в .env
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, line := range strings.Split(string(body), "\n") {
+		if i := strings.IndexByte(line, '#'); i >= 0 {
+			line = line[:i]
+		}
+		if fields := strings.Fields(line); len(fields) > 0 {
+			out = append(out, fields[0])
+		}
+	}
+	return out, nil
 }
 
 // PostgresAddr — адрес базы для проверки готовности.
